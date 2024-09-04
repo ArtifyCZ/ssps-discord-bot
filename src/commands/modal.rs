@@ -8,8 +8,7 @@ pub async fn run(ctx: &Context, interaction: &CommandInteraction) -> Result<(), 
         .timeout(std::time::Duration::from_secs(600))
         .short_field("First name")
         .short_field("Last name")
-        .paragraph_field("Hobbies and interests")
-    ;
+        .paragraph_field("Hobbies and interests");
     let response = interaction.quick_modal(ctx, modal).await?.unwrap();
 
     let inputs = response.inputs;
