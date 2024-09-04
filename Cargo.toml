@@ -6,6 +6,9 @@ name = "ssps-discord-bot"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "ssps-discord-bot"
+
 [dependencies]
 anyhow = "1.0.86"
 async-trait = "0.1.80"

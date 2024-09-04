@@ -1,0 +1,8 @@
+---
+-   name: Deploy the bot
+    hosts: tux
+    roles:
+        -   role: ssps-discord-bot
+    vars_files:
+        - vars.yaml
+        - secrets.yaml

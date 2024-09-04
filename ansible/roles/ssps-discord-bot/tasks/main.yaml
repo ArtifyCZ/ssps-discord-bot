@@ -1,0 +1,41 @@
+---
+-   name: Login to the GitHub Docker registry
+    community.docker.docker_login:
+        registry_url: "ghcr.io"
+        username: "{{ github_docker_registry_username }}"
+        password: "{{ github_docker_registry_token }}"
+        reauthorize: yes
+-   name: Pull the bot
+    community.docker.docker_image:
+        name: "{{ bot_image }}:latest"
+        source: pull
+        force_source: yes
+        force_tag: yes
+        tag: latest
+        state: present
+-   name: Create bot config directory
+    ansible.builtin.file:
+        path: "{{ bot_env_file | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: 0664
+    become: yes
+-   name: Set the bot config
+    ansible.builtin.template:
+        src: ".env.j2"
+        dest: "{{ bot_env_file }}"
+        owner: root
+        group: root
+        mode: 0664
+    become: yes
+-   name: Start the bot
+    community.docker.docker_container:
+        name: "{{ bot_container_name }}"
+        image: "{{ bot_image }}:latest"
+        state: started
+        pull: never
+        recreate: true
+        restart_policy: always
+        volumes:
+            - "{{ bot_env_file }}:/app/.env"

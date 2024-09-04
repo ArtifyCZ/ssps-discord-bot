@@ -44,7 +44,7 @@ impl serenity::prelude::EventHandler for EventHandler {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    dotenv::dotenv()?;
+    dotenv::dotenv().ok();
     let token = env::var("DISCORD_BOT_TOKEN")?;
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;
