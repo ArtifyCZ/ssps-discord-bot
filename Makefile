@@ -18,3 +18,7 @@ deploy: ## Deploy the application on production
 	# deploy the application
 	@echo "Deploying the application on production..."
 	@ansible-playbook ansible/deploy.yaml -i ansible/inventory.yaml
+
+cs-fix: ## Fix coding standards issues
+	@echo "Fixing coding standards issues..."
+	@cargo fmt

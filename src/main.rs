@@ -18,10 +18,7 @@ impl serenity::prelude::EventHandler for EventHandler {
         let guild_id = env::var("DISCORD_GUILD_ID").unwrap();
         let guild_id = GuildId::new(guild_id.parse().unwrap());
         guild_id
-            .set_commands(
-                &ctx.http,
-                vec![commands::modal::register()],
-            )
+            .set_commands(&ctx.http, vec![commands::modal::register()])
             .await
             .unwrap();
     }
