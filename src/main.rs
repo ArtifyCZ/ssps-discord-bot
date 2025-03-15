@@ -20,7 +20,7 @@ impl serenity::prelude::EventHandler for EventHandler {
         guild_id
             .set_commands(
                 &ctx.http,
-                vec![commands::ping::register(), commands::modal::register()],
+                vec![commands::modal::register()],
             )
             .await
             .unwrap();
@@ -29,7 +29,6 @@ impl serenity::prelude::EventHandler for EventHandler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Command(command) = interaction {
             let content = match command.data.name.as_str() {
-                "ping" => Some(commands::ping::run(&command.data.options())),
                 "modal" => {
                     commands::modal::run(&ctx, &command).await.unwrap();
                     None

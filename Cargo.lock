@@ -1419,7 +1419,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "dotenv",
- "secrecy",
  "serenity",
  "tokio",
 ]

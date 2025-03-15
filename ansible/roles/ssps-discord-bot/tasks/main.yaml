@@ -29,6 +29,10 @@
         group: root
         mode: 0664
     become: yes
+-   name: Create Docker network
+    community.docker.docker_network:
+        name: "{{ docker_network_name }}"
+        state: present
 -   name: Start the bot
     community.docker.docker_container:
         name: "{{ bot_container_name }}"
@@ -39,3 +43,5 @@
         restart_policy: always
         volumes:
             - "{{ bot_env_file }}:/app/.env"
+        networks:
+            -   name: "{{ docker_network_name }}"

@@ -1,0 +1,9 @@
+version: '3.9'
+services:
+    bot:
+        image: ghcr.io/artifycz/ssps-discord-bot/ssps-discord-bot:latest
+        container_name: ssps-discord-bot
+        restart: unless-stopped
+        volumes:
+            - ./.env:/app/.env
+        platform: linux/amd64

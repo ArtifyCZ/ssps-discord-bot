@@ -13,6 +13,5 @@ name = "ssps-discord-bot"
 anyhow = "1.0.86"
 async-trait = "0.1.80"
 dotenv = "0.15.0"
-secrecy = "0.8.0"
 serenity = { version = "0.12.1", features = ["full"] }
 tokio = { version = "1.37.0", features = ["macros", "rt-multi-thread"] }

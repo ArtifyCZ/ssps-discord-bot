@@ -1,4 +1,4 @@
-FROM rust:1.80-bookworm AS builder
+FROM rust:1.84 AS builder
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ RUN cargo build --release
 RUN rm src/main.rs
 
 COPY src ./src
-RUN cargo build --release
+RUN cargo install --path .
 
 FROM debian:bookworm
 
@@ -25,8 +25,8 @@ RUN groupadd -g $GID $UGROUP \
     && chown -R $UNAME:$UGROUP /app \
     && chmod -R 755 /app
 
-COPY --from=builder --chown=$UNAME:$UGROUP /app/target/release/ssps-discord-bot .
+COPY --from=builder --chown=$UNAME:$UGROUP --chmod=755 /usr/local/cargo/bin/ssps-discord-bot /usr/local/bin/ssps-discord-bot
 
 USER $UNAME
 
-CMD ["./ssps-discord-bot"]
+CMD ["ssps-discord-bot"]
