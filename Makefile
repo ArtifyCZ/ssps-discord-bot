@@ -8,11 +8,6 @@ help: ## Show possible targets
 	@echo "Available targets:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-publish: ## Builds and publishes the application's container to GitHub's container registry
-	@echo "Publishing the application to GitHub's container registry..."
-	@docker build . -t ghcr.io/artifycz/ssps-discord-bot/ssps-discord-bot --platform linux/amd64
-	@docker push ghcr.io/artifycz/ssps-discord-bot/ssps-discord-bot --platform linux/amd64
-
 deploy: ## Deploy the application on production; requires publishing to GitHub's container registry first
 	@echo "Deploying the application on production"
 	@read -p "Are you sure you want to deploy the application on production? [y/N] " answer; \
