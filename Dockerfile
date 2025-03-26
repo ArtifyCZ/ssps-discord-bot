@@ -8,6 +8,7 @@ RUN cargo fetch
 RUN cargo build --release
 RUN rm src/main.rs
 
+COPY resources ./resources
 COPY src ./src
 RUN cargo install --path .
 
@@ -23,7 +24,11 @@ ARG GID=541
 RUN groupadd -g $GID $UGROUP \
     && useradd -u $UID -g $GID -s /bin/bash $UNAME \
     && chown -R $UNAME:$UGROUP /app \
-    && chmod -R 755 /app
+    && chmod -R 755 /app \
+    && apt-get update \
+    && apt-get install -y libssl-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder --chown=$UNAME:$UGROUP --chmod=755 /usr/local/cargo/bin/ssps-discord-bot /usr/local/bin/ssps-discord-bot
 
