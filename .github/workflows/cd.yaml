@@ -1,7 +1,6 @@
-name: Continuous Deployment
+name: Continuous Delivery
 on:
-    push:
-        branches: [ "master" ]
+    workflow_dispatch:
 
 concurrency:
     group: production
@@ -11,4 +10,16 @@ jobs:
     deploy:
         runs-on: ubuntu-latest
         environment: production
-
+        steps:
+            -  uses: actions/checkout@v4
+            -  name: Set SSH key
+               run: |
+                   mkdir -p ~/.ssh
+                   echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
+            -   name: Run playbook
+                uses: dawidd6/action-ansible-playbook@v3
+                with:
+                    playbook: ansible/deploy.yaml
+                    vault_password: ${{ secrets.VAULT_PASSWORD }}
+                    options:
+                        --inventory ansible/inventory.yaml
