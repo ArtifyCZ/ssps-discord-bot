@@ -1,17 +1,4 @@
-[package]
-authors = [
-    "Richard Tichý <tichy@artify.zone>",
+[workspace]
+members = [
+    "bootstrap",
 ]
-name = "ssps-discord-bot"
-version = "0.1.0"
-edition = "2021"
-
-[[bin]]
-name = "ssps-discord-bot"
-
-[dependencies]
-anyhow = "1.0.86"
-dotenv = "0.15.0"
-poise = "0.6.1"
-serenity = { version = "0.12.4", features = ["full"] }
-tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
