@@ -1,6 +1,7 @@
-use serenity::all::{ClientBuilder, GuildId};
+use serenity::all::GuildId;
 use std::env;
 
+use crate::bot::run_bot;
 use poise::serenity_prelude as serenity;
 
 struct Data {}
@@ -8,7 +9,7 @@ struct Data {}
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
-mod commands;
+mod bot;
 mod resources;
 
 #[tokio::main]
@@ -23,33 +24,6 @@ async fn main() -> anyhow::Result<()> {
     let bot = tokio::spawn(run_bot(token, intents, guild));
 
     bot.await??;
-
-    Ok(())
-}
-
-async fn run_bot(
-    token: String,
-    intents: serenity::GatewayIntents,
-    guild: GuildId,
-) -> anyhow::Result<()> {
-    let framework = poise::Framework::builder()
-        .options(poise::FrameworkOptions {
-            commands: commands::enabled_commands(),
-            ..Default::default()
-        })
-        .setup(move |ctx, _ready, framework| {
-            Box::pin(async move {
-                poise::builtins::register_in_guild(ctx, &framework.options().commands, guild)
-                    .await?;
-                Ok(Data {})
-            })
-        })
-        .build();
-
-    let client = ClientBuilder::new(token, intents)
-        .framework(framework)
-        .await;
-    client.unwrap().start().await?;
 
     Ok(())
 }
