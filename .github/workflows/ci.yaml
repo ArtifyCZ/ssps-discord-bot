@@ -69,4 +69,5 @@ jobs:
                     file: ./release.Dockerfile
                     platforms: linux/amd64
                     push: true
+                    # TODO: The tag should be the commit hash. IT SHOULD BE LATEST ONLY ON MASTER!
                     tags: ghcr.io/artifycz/ssps-discord-bot/ssps-discord-bot:latest
