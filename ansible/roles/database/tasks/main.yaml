@@ -1,2 +1,28 @@
 ---
--   name: 
+-   name: Pull the database
+    community.docker.docker_image:
+        name: "postgres:17"
+        source: pull
+        force_source: no
+        force_tag: yes
+        tag: latest
+        state: present
+-   name: Create Docker network
+    community.docker.docker_network:
+        name: "{{ docker_network_name }}"
+        state: present
+-   name: Start the database
+    community.docker.docker_container:
+        name: "{{ database_container_name }}"
+        image: "postgres:17"
+        hostname: "{{ database_container_hostname }}"
+        state: started
+        pull: never
+        recreate: true
+        restart_policy: always
+        env:
+            POSTGRES_DB: "{{ database_name }}"
+            POSTGRES_USER: "{{ database_user }}"
+            POSTGRES_PASSWORD: "{{ database_password }}"
+        networks:
+            -   name: "{{ docker_network_name }}"

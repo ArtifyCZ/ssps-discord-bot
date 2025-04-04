@@ -33,6 +33,23 @@
     community.docker.docker_network:
         name: "{{ docker_network_name }}"
         state: present
+-   name: Run pending database migrations
+    community.docker.docker_container:
+        name: "{{ bot_container_name }}-migrate"
+        image: "{{ bot_image }}:latest"
+        command: "ssps-discord-bot migrate"
+        state: started
+        pull: never
+        recreate: true
+        restart_policy: no
+        volumes:
+            - "{{ bot_env_file }}:/app/.env"
+        networks:
+            -   name: "{{ docker_network_name }}"
+    register: migrate_result
+    until: migrate_result is not failed
+    retries: 3
+    delay: 5
 -   name: Start the bot
     community.docker.docker_container:
         name: "{{ bot_container_name }}"

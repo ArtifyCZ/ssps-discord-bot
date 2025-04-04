@@ -20,4 +20,4 @@ COPY --chown=$UNAME:$UGROUP --chmod=755 target/release/ssps-discord-bot /usr/loc
 
 USER $UNAME
 
-CMD ["ssps-discord-bot"]
+CMD ["ssps-discord-bot", "run"]

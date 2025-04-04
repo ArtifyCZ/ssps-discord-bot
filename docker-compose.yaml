@@ -1,4 +1,3 @@
-version: '3.9'
 services:
     bot:
         image: ghcr.io/artifycz/ssps-discord-bot/ssps-discord-bot:latest
@@ -7,3 +6,21 @@ services:
         volumes:
             - ./.env:/app/.env
         platform: linux/amd64
+        networks:
+            - ssps-discord-bot
+    database:
+        image: postgres:17
+        container_name: ssps-discord-bot-db
+        hostname: ssps-discord-bot-db
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: ssps_discord_bot
+            POSTGRES_USER: ssps_discord_bot
+            POSTGRES_PASSWORD: ssps_discord_bot
+        ports:
+            - "5432:5432"
+        networks:
+            -   ssps-discord-bot
+
+networks:
+    ssps-discord-bot:
