@@ -1,0 +1,9 @@
+[package]
+name = "infrastructure"
+edition = "2021"
+
+[dependencies]
+domain = { path = "../domain" }
+
+async-trait = "0.1.87"
+poise = "0.6.1"

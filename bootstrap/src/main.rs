@@ -1,16 +1,10 @@
-use serenity::all::GuildId;
-use std::env;
+mod locator;
 
-use crate::bot::run_bot;
+use anyhow::anyhow;
 use poise::serenity_prelude as serenity;
-
-struct Data {}
-
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, Data, Error>;
-
-mod bot;
-mod resources;
+use presentation::discord::run_bot;
+use serenity::all::{ClientBuilder, GuildId};
+use std::env;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -21,9 +15,13 @@ async fn main() -> anyhow::Result<()> {
         .map(|id| GuildId::new(id))?;
     let intents = serenity::GatewayIntents::non_privileged();
 
-    let bot = tokio::spawn(run_bot(token, intents, guild));
+    let client = ClientBuilder::new(&token, intents).await?.http;
 
-    bot.await??;
+    let locator = locator::ApplicationPortLocator::new(client);
+
+    let bot = tokio::spawn(run_bot(locator, token, intents, guild));
+
+    bot.await?.map_err(|e| anyhow!(e))?;
 
     Ok(())
 }

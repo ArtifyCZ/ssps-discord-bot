@@ -1,14 +1,18 @@
-use crate::Data;
+use crate::application_ports::Locator;
 use poise::serenity_prelude as serenity;
-use serenity::all::{ClientBuilder, GuildId};
+use poise::serenity_prelude::{ClientBuilder, GuildId};
 
-mod commands;
+pub mod commands;
 
-pub async fn run_bot(
+pub type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type Context<'a, D> = poise::Context<'a, D, Error>;
+
+pub async fn run_bot<L: Locator + Send + Sync + 'static>(
+    locator: L,
     token: String,
     intents: serenity::GatewayIntents,
     guild: GuildId,
-) -> anyhow::Result<()> {
+) -> Result<(), Error> {
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: commands::enabled_commands(),
@@ -18,7 +22,7 @@ pub async fn run_bot(
             Box::pin(async move {
                 poise::builtins::register_in_guild(ctx, &framework.options().commands, guild)
                     .await?;
-                Ok(Data {})
+                Ok(locator)
             })
         })
         .build();

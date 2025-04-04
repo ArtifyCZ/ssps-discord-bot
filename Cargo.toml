@@ -1,4 +1,9 @@
 [workspace]
 members = [
+    "application",
+    "application-ports",
     "bootstrap",
+    "domain",
+    "domain-shared",
+    "infrastructure",
 ]
