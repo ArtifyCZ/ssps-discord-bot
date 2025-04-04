@@ -1,6 +1,6 @@
 *
-!resources/
-!src/
+!*/resources/
+!*/src/
 !Cargo.lock
-!Cargo.toml
+!*/Cargo.toml
 !target/release/ssps-discord-bot

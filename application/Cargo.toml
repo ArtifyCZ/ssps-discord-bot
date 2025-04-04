@@ -1,0 +1,9 @@
+[package]
+name = "application"
+edition = "2021"
+
+[dependencies]
+application-ports = { path = "../application-ports" }
+domain = { path = "../domain" }
+
+async-trait = "0.1.87"

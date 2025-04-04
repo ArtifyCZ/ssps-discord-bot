@@ -1,0 +1,23 @@
+[package]
+name = "bootstrap"
+authors = [
+    "Richard Tichý <tichy@artify.zone>",
+]
+edition = "2021"
+
+[[bin]]
+name = "ssps-discord-bot"
+path = "src/main.rs"
+
+[dependencies]
+application = { path = "../application" }
+application-ports = { path = "../application-ports" }
+domain = { path = "../domain" }
+infrastructure = { path = "../infrastructure" }
+presentation = { path = "../presentation" }
+
+anyhow = "1.0.86"
+dotenv = "0.15.0"
+poise = "0.6.1"
+serenity = { version = "0.12.4", features = ["full"] }
+tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }

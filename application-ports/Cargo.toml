@@ -1,0 +1,8 @@
+[package]
+name = "application-ports"
+edition = "2021"
+
+[dependencies]
+domain-shared = { path = "../domain-shared" }
+
+async-trait = "0.1.87"

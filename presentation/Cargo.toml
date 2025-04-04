@@ -1,0 +1,8 @@
+[package]
+name = "presentation"
+edition = "2021"
+
+[dependencies]
+application-ports = { path = "../application-ports" }
+
+poise = "0.6.1"

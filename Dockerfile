@@ -8,8 +8,8 @@ RUN cargo fetch
 RUN cargo build --release
 RUN rm src/main.rs
 
-COPY resources ./resources
-COPY src ./src
+COPY bootstrap/resources ./resources
+COPY bootstrap/src ./src
 RUN cargo install --path .
 
 FROM debian:bookworm

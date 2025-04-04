@@ -1,37 +1,18 @@
-use serenity::all::{ClientBuilder, GuildId};
-use std::env;
-
+use crate::application_ports::Locator;
 use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{ClientBuilder, GuildId};
 
-struct Data {}
+pub mod commands;
 
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, Data, Error>;
+pub type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type Context<'a, D> = poise::Context<'a, D, Error>;
 
-mod commands;
-mod resources;
-
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    dotenv::dotenv().ok();
-    let token = env::var("DISCORD_BOT_TOKEN")?;
-    let guild = env::var("DISCORD_GUILD_ID")?
-        .parse::<u64>()
-        .map(|id| GuildId::new(id))?;
-    let intents = serenity::GatewayIntents::non_privileged();
-
-    let bot = tokio::spawn(run_bot(token, intents, guild));
-
-    bot.await??;
-
-    Ok(())
-}
-
-async fn run_bot(
+pub async fn run_bot<L: Locator + Send + Sync + 'static>(
+    locator: L,
     token: String,
     intents: serenity::GatewayIntents,
     guild: GuildId,
-) -> anyhow::Result<()> {
+) -> Result<(), Error> {
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: commands::enabled_commands(),
@@ -41,7 +22,7 @@ async fn run_bot(
             Box::pin(async move {
                 poise::builtins::register_in_guild(ctx, &framework.options().commands, guild)
                     .await?;
-                Ok(Data {})
+                Ok(locator)
             })
         })
         .build();
