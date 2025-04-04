@@ -12,6 +12,23 @@ env:
 jobs:
     bot:
         runs-on: ubuntu-latest
+        services:
+            postgres:
+                image: postgres
+                env:
+                    POSTGRES_HOST: postgres
+                    POSTGRES_USER: postgres
+                    POSTGRES_DB: ssps-discord-bot
+                    POSTGRES_PASSWORD: postgres
+                options: >-
+                    --health-cmd pg_isready
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
+                ports:
+                    - 5432:5432
+        env:
+            DATABASE_URL: postgres://postgres:postgres@localhost:5432/ssps-discord-bot
         steps:
             -   uses: actions/checkout@v4
             -   name: Set up Rust caching
@@ -30,8 +47,15 @@ jobs:
                     lookup-only: false
                     cache-provider: "github"
                     cache-bin: true
+            -   name: Install SQLx CLI
+                uses: baptiste0928/cargo-install@v3
+                with:
+                    crate: sqlx-cli
+                    version: "^0.7.0"
             -   name: Run fmt
                 run: cargo fmt -- --check
+            -   name: Apply migrations
+                run: cd infrastructure && sqlx migrate run
             -   name: Build
                 run: cargo build --verbose --release
             -   name: Run Clippy

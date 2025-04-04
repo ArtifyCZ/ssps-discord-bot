@@ -3,7 +3,8 @@ use crate::discord::Error;
 use poise::Command;
 
 pub mod update_information;
+pub mod verify;
 
 pub fn enabled_commands<L: Locator + Send + Sync + 'static>() -> Vec<Command<L, Error>> {
-    vec![update_information::command()]
+    vec![update_information::command(), verify::command()]
 }

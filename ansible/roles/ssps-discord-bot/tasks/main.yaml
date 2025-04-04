@@ -54,6 +54,7 @@
     community.docker.docker_container:
         name: "{{ bot_container_name }}"
         image: "{{ bot_image }}:latest"
+        hostname: "{{ bot_container_hostname }}"
         state: started
         pull: never
         recreate: true
@@ -62,3 +63,4 @@
             - "{{ bot_env_file }}:/app/.env"
         networks:
             -   name: "{{ docker_network_name }}"
+            -   name: "{{ public_network_name }}"
