@@ -10,7 +10,8 @@ pub struct ApplicationPortLocator {
 }
 
 impl ApplicationPortLocator {
-    pub fn new(serenity_client: Arc<Http>) -> Self {
+    pub fn new(database_connection: sqlx::PgPool, serenity_client: Arc<Http>) -> Self {
+        let _ = database_connection; // Suppress unused variable warning
         let discord_adapter = Arc::new(DiscordAdapter::new(serenity_client.clone()));
         let information_channel_adapter =
             Arc::new(InformationChannelService::new(discord_adapter.clone()));
