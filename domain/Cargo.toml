@@ -6,3 +6,4 @@ edition = "2021"
 domain-shared = { path = "../domain-shared" }
 
 async-trait = "0.1.87"
+chrono = "0.4.40"

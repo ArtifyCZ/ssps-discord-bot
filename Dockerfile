@@ -34,4 +34,4 @@ COPY --from=builder --chown=$UNAME:$UGROUP --chmod=755 /usr/local/cargo/bin/ssps
 
 USER $UNAME
 
-CMD ["ssps-discord-bot", "run"]
+CMD ["ssps-discord-bot", "serve"]

@@ -12,7 +12,7 @@ RUN groupadd -g $GID $UGROUP \
     && chown -R $UNAME:$UGROUP /app \
     && chmod -R 755 /app \
     && apt-get update \
-    && apt-get install -y libssl-dev \
+    && apt-get install -y libssl-dev openssl curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -20,4 +20,6 @@ COPY --chown=$UNAME:$UGROUP --chmod=755 target/release/ssps-discord-bot /usr/loc
 
 USER $UNAME
 
-CMD ["ssps-discord-bot", "run"]
+EXPOSE 8080
+
+CMD ["ssps-discord-bot", "serve"]
