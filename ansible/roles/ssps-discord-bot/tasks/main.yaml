@@ -7,11 +7,11 @@
         reauthorize: yes
 -   name: Pull the bot
     community.docker.docker_image:
-        name: "{{ bot_image }}:latest"
+        name: "{{ bot_image }}:{{ bot_image_tag }}"
         source: pull
-        force_source: yes
+        force_source: no
         force_tag: yes
-        tag: latest
+        tag: "{{ bot_image_tag }}"
         state: present
 -   name: Create bot config directory
     ansible.builtin.file:
@@ -36,7 +36,7 @@
 -   name: Run pending database migrations
     community.docker.docker_container:
         name: "{{ bot_container_name }}-migrate"
-        image: "{{ bot_image }}:latest"
+        image: "{{ bot_image }}:{{ bot_image_tag }}"
         command: "ssps-discord-bot migrate"
         state: started
         pull: never
@@ -53,7 +53,7 @@
 -   name: Start the bot
     community.docker.docker_container:
         name: "{{ bot_container_name }}"
-        image: "{{ bot_image }}:latest"
+        image: "{{ bot_image }}:{{ bot_image_tag }}"
         hostname: "{{ bot_container_hostname }}"
         state: started
         pull: never
