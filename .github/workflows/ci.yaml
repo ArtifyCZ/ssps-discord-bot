@@ -2,9 +2,11 @@ name: Continuous Integration
 
 on:
     push:
-        branches: [ "master" ]
+        branches:
+            - master
     pull_request:
-        branches: [ "master" ]
+        branches:
+            - master
 
 env:
     CARGO_TERM_COLOR: always
@@ -69,8 +71,20 @@ jobs:
     bot-docker:
         runs-on: ubuntu-latest
         needs: bot
+        env:
+            DOCKER_METADATA_PR_HEAD_SHA: true
         steps:
             -   uses: actions/checkout@v4
+            -   name: Docker meta
+                id: meta
+                uses: docker/metadata-action@v5
+                with:
+                    images: |
+                        ghcr.io/artifycz/ssps-discord-bot/ssps-discord-bot
+                    tags: |
+                        type=ref,event=branch
+                        type=ref,event=pr
+                        type=sha,format=long
             -   name: Login to GitHub Container Registry
                 uses: docker/login-action@v3
                 with:
@@ -87,11 +101,11 @@ jobs:
                     name: ssps-discord-bot
                     path: target/release
             -   name: Build and push
-                uses: docker/build-push-action@v3
+                uses: docker/build-push-action@v6
                 with:
                     context: .
                     file: ./release.Dockerfile
                     platforms: linux/amd64
                     push: true
-                    # TODO: The tag should be the commit hash. IT SHOULD BE LATEST ONLY ON MASTER!
-                    tags: ghcr.io/artifycz/ssps-discord-bot/ssps-discord-bot:latest
+                    tags: ${{ steps.meta.outputs.tags }}
+                    labels: ${{ steps.meta.outputs.labels }}
