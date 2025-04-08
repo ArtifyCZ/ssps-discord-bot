@@ -7,3 +7,4 @@ members = [
     "domain-shared",
     "infrastructure",
 ]
+resolver = "2"

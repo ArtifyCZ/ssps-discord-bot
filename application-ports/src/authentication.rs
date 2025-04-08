@@ -18,6 +18,7 @@ pub trait AuthenticationPort {
 #[derive(Debug)]
 pub enum AuthenticationError {
     Error(Box<dyn std::error::Error + Send + Sync + 'static>),
+    AlreadyAuthenticated,
 }
 
 impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for AuthenticationError {

@@ -1,5 +1,7 @@
-use crate::ports::discord::{CreateAttachment, CreateMessage};
+use crate::ports::discord::{CreateActionRow, CreateAttachment, CreateButton, CreateMessage};
 use crate::resources;
+
+pub const VERIFY_ME_BUTTON_ID: &str = "verify_me_button";
 
 pub fn create_messages() -> Vec<CreateMessage> {
     vec![
@@ -17,5 +19,11 @@ pub fn create_messages() -> Vec<CreateMessage> {
         CreateMessage::default().content(resources::CONTACTS_MD),
         CreateMessage::default().content(resources::RULES_MD),
         CreateMessage::default().content(resources::ANNOUNCEMENT_GUIDELINES_MD),
+        CreateMessage::default()
+            .content(resources::VERIFICATION_MD)
+            .action_rows(vec![CreateActionRow::buttons(vec![CreateButton::new(
+                "Ověřit se",
+                VERIFY_ME_BUTTON_ID,
+            )])]),
     ]
 }

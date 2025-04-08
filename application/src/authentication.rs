@@ -50,6 +50,14 @@ impl AuthenticationPort for AuthenticationService {
         &self,
         user_id: UserId,
     ) -> Result<AuthenticationLink, AuthenticationError> {
+        if let Some(_user) = self
+            .authenticated_user_repository
+            .find_by_user_id(user_id)
+            .await?
+        {
+            return Err(AuthenticationError::AlreadyAuthenticated);
+        }
+
         let (link, csrf_token) = self.oauth_port.create_authentication_link().await?;
 
         let request = UserAuthenticationRequest {
