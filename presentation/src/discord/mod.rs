@@ -1,6 +1,7 @@
 use crate::application_ports::Locator;
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::{ClientBuilder, ComponentInteractionDataKind, GuildId, Interaction};
+use tracing::instrument;
 
 mod buttons;
 pub mod commands;
@@ -8,6 +9,7 @@ pub mod commands;
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a, D> = poise::Context<'a, D, Error>;
 
+#[instrument(level = "debug", skip(locator, token, intents, guild))]
 pub async fn run_bot<L: Locator + Send + Sync + 'static>(
     locator: L,
     token: String,
@@ -39,6 +41,7 @@ pub async fn run_bot<L: Locator + Send + Sync + 'static>(
     Ok(())
 }
 
+#[instrument(level = "debug", skip(ctx, event, framework, locator))]
 async fn event_handler<L: Locator>(
     ctx: &serenity::Context,
     event: &serenity::FullEvent,

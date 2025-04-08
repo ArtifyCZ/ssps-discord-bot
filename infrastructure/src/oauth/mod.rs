@@ -19,6 +19,7 @@ use oauth2::{
 };
 use reqwest::Client as HttpClient;
 use serde::Deserialize;
+use tracing::instrument;
 
 pub struct OAuthAdapter {
     oauth_client: OAuthClient,
@@ -47,6 +48,7 @@ struct UserGroupResponse {
 }
 
 impl OAuthAdapter {
+    #[instrument(level = "trace", skip_all)]
     pub fn new(
         authentication_callback_url: Url,
         client_id: ClientId,
@@ -71,6 +73,7 @@ impl OAuthAdapter {
 
 #[async_trait]
 impl OAuthPort for OAuthAdapter {
+    #[instrument(level = "debug", err, skip(self))]
     async fn create_authentication_link(
         &self,
     ) -> domain::ports::oauth::Result<(AuthenticationLink, CsrfToken)> {
@@ -88,6 +91,7 @@ impl OAuthPort for OAuthAdapter {
         ))
     }
 
+    #[instrument(level = "debug", err, skip(self, client_callback_token))]
     async fn exchange_code_after_callback(
         &self,
         client_callback_token: ClientCallbackToken,
@@ -106,6 +110,7 @@ impl OAuthPort for OAuthAdapter {
         Ok((AccessToken(access_token), RefreshToken(refresh_token)))
     }
 
+    #[instrument(level = "debug", err, skip(self, access_token))]
     async fn get_user_groups(
         &self,
         access_token: AccessToken,
@@ -125,6 +130,10 @@ impl OAuthPort for OAuthAdapter {
     }
 }
 
+#[instrument(
+    level = "trace",
+    skip(tenant_id, client_id, client_secret, callback_url)
+)]
 fn create_oauth_client(
     tenant_id: TenantId,
     client_id: ClientId,

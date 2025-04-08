@@ -2,12 +2,14 @@ use crate::application_ports::Locator;
 use crate::discord::{Context, Error};
 use application_ports::discord::ChannelId;
 use application_ports::information_channel::InformationChannelError;
+use tracing::instrument;
 
 #[poise::command(
     slash_command,
     rename = "update-information",
     required_permissions = "ADMINISTRATOR"
 )]
+#[instrument(level = "info", skip(ctx))]
 pub async fn command<D: Sync + Locator>(ctx: Context<'_, D>) -> Result<(), Error> {
     let information_channel_port = ctx.data().get_information_channel_port();
     ctx.defer().await?;

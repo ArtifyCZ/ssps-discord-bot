@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use domain_shared::authentication::{AuthenticationLink, ClientCallbackToken, CsrfToken};
 use domain_shared::discord::{InviteLink, UserId};
+use tracing::{event, instrument, Level};
 
 #[async_trait]
 pub trait AuthenticationPort {
@@ -22,7 +23,9 @@ pub enum AuthenticationError {
 }
 
 impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for AuthenticationError {
+    #[instrument(level = "trace", skip(e))]
     fn from(e: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
+        event!(Level::ERROR, "Error: {:?}", e);
         AuthenticationError::Error(e)
     }
 }

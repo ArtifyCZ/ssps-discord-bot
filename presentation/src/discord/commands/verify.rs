@@ -4,12 +4,14 @@ use application_ports::authentication::AuthenticationError;
 use domain_shared::discord::UserId;
 use poise::serenity_prelude::{ButtonStyle, CreateActionRow, CreateButton, Mentionable};
 use poise::CreateReply;
+use tracing::instrument;
 
 #[poise::command(
     slash_command,
     rename = "verify",
     required_permissions = "ADMINISTRATOR"
 )]
+#[instrument(level = "info", skip(ctx))]
 pub async fn command<D: Sync + Locator>(ctx: Context<'_, D>) -> Result<(), Error> {
     let authentication_port = ctx.data().get_authentication_port();
 

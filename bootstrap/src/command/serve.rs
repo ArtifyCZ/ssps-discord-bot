@@ -17,8 +17,9 @@ use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUse
 use infrastructure::authentication::user_authentication_request::PostgresUserAuthenticationRequestRepository;
 use infrastructure::discord::DiscordAdapter;
 use poise::serenity_prelude as serenity;
+use tracing::instrument;
 
-#[derive(Args, Debug)]
+#[derive(Args)]
 pub struct ServeArgs {
     #[arg(long, env = "AUTHENTICATION_CALLBACK_URL")]
     pub authentication_callback_url: String,
@@ -42,6 +43,7 @@ pub struct ServeArgs {
     pub invite_link: String,
 }
 
+#[instrument(level = "trace", skip(common_args, args))]
 pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()> {
     let CommonArgs { database_url } = common_args;
     let ServeArgs {

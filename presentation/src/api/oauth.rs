@@ -4,6 +4,7 @@ use axum::extract::State;
 use axum::response::Redirect;
 use domain_shared::authentication::{ClientCallbackToken, CsrfToken};
 use serde::Deserialize;
+use tracing::instrument;
 
 #[derive(Deserialize)]
 pub struct AuthRequest {
@@ -11,6 +12,7 @@ pub struct AuthRequest {
     state: String,
 }
 
+#[instrument(level = "info", skip(service_locator, query))]
 pub async fn callback_handler<L: Locator>(
     State(service_locator): State<L>,
     Query(query): Query<AuthRequest>,

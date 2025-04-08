@@ -6,9 +6,11 @@ use poise::serenity_prelude::{
     ButtonStyle, CreateActionRow, CreateButton, CreateInteractionResponse, Mentionable,
 };
 use poise::{serenity_prelude as serenity, CreateReply};
+use tracing::instrument;
 
 pub const BUTTON_ID: &str = domain::information_channel::VERIFY_ME_BUTTON_ID;
 
+#[instrument(level = "info", skip(ctx, interaction, _framework, locator))]
 pub async fn handle_button_click<L: Locator>(
     ctx: &serenity::Context,
     interaction: &serenity::ComponentInteraction,

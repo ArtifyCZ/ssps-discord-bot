@@ -111,6 +111,7 @@ dependencies = [
  "chrono",
  "domain",
  "domain-shared",
+ "tracing",
 ]
 
 [[package]]
@@ -119,6 +120,7 @@ version = "0.0.0"
 dependencies = [
  "async-trait",
  "domain-shared",
+ "tracing",
 ]
 
 [[package]]
@@ -303,6 +305,7 @@ dependencies = [
  "serenity",
  "sqlx",
  "tokio",
+ "tracing",
  "url",
 ]
 
@@ -682,6 +685,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "domain-shared",
+ "tracing",
 ]
 
 [[package]]
@@ -1364,6 +1368,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
+ "tracing",
 ]
 
 [[package]]
@@ -1810,6 +1815,7 @@ dependencies = [
  "poise",
  "serde",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

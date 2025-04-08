@@ -1,8 +1,10 @@
 use crate::application_ports::Locator;
 use axum::Router;
+use tracing::instrument;
 
 pub mod oauth;
 
+#[instrument(level = "trace", skip())]
 pub fn create_router<L: Locator + Send + Sync + Clone + 'static>() -> Router<L> {
     Router::new().route(
         "/oauth/callback",
@@ -10,6 +12,7 @@ pub fn create_router<L: Locator + Send + Sync + Clone + 'static>() -> Router<L> 
     )
 }
 
+#[instrument(level = "debug", skip(locator))]
 pub async fn run_api<L: Locator + Send + Sync + Clone + 'static>(
     locator: L,
     port: u16,

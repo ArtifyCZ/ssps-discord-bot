@@ -16,6 +16,7 @@ use poise::serenity_prelude::GuildId;
 use serenity::all::{Builder, Http};
 use serenity::futures::StreamExt;
 use std::sync::Arc;
+use tracing::instrument;
 
 pub struct DiscordAdapter {
     client: Arc<Http>,
@@ -23,6 +24,7 @@ pub struct DiscordAdapter {
 }
 
 impl DiscordAdapter {
+    #[instrument(level = "trace", skip_all)]
     pub fn new(client: Arc<Http>, guild_id: GuildId) -> Self {
         Self { client, guild_id }
     }
@@ -30,6 +32,7 @@ impl DiscordAdapter {
 
 #[async_trait]
 impl DiscordPort for DiscordAdapter {
+    #[instrument(level = "debug", err, skip(self, channel_id, message))]
     async fn send_message(&self, channel_id: ChannelId, message: CreateMessage) -> Result<()> {
         let message = domain_to_serenity_create_message(message);
         let channel_id = domain_to_serenity_channel_id(channel_id);
@@ -39,6 +42,7 @@ impl DiscordPort for DiscordAdapter {
         Ok(())
     }
 
+    #[instrument(level = "debug", err, skip(self, channel_id))]
     async fn purge_messages(&self, channel_id: ChannelId) -> Result<()> {
         let channel_id = domain_to_serenity_channel_id(channel_id);
 
@@ -52,6 +56,7 @@ impl DiscordPort for DiscordAdapter {
         Ok(())
     }
 
+    #[instrument(level = "debug", err, skip(self, user_id, class_id))]
     async fn assign_user_to_class_role(&self, user_id: UserId, class_id: String) -> Result<()> {
         let user_id = domain_to_serenity_user_id(user_id);
         let class_id = class_id.to_uppercase();

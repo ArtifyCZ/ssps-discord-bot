@@ -2,7 +2,9 @@ use crate::discord::create_attachment::domain_to_serenity_create_attachment;
 use crate::discord::create_button::domain_to_serenity_create_button;
 use domain::ports::discord::{CreateActionRow, CreateMessage};
 use poise::serenity_prelude as serenity;
+use tracing::instrument;
 
+#[instrument(level = "trace", skip(message))]
 pub fn domain_to_serenity_create_message(message: CreateMessage) -> serenity::CreateMessage {
     let CreateMessage {
         content,
