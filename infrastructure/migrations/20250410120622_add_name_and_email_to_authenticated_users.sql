@@ -1,0 +1,3 @@
+ALTER TABLE authenticated_users ADD COLUMN name VARCHAR(255) DEFAULT NULL;
+
+ALTER TABLE authenticated_users ADD COLUMN email VARCHAR(255) DEFAULT NULL;

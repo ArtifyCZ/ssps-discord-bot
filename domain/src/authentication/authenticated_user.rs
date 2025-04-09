@@ -9,7 +9,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct AuthenticatedUser {
     pub user_id: UserId,
+    pub name: Option<String>,
+    pub email: Option<String>,
     pub access_token: AccessToken,
+    pub access_token_expires_at: DateTime<Utc>,
     pub refresh_token: RefreshToken,
     pub class_id: String,
     pub authenticated_at: DateTime<Utc>,

@@ -1,10 +1,15 @@
 use async_trait::async_trait;
 use domain_shared::authentication::{AuthenticationLink, ClientCallbackToken, CsrfToken};
 use domain_shared::discord::{InviteLink, UserId};
-use tracing::{error, instrument};
+use thiserror::Error;
+use tracing::error;
 
 #[async_trait]
 pub trait AuthenticationPort {
+    async fn get_user_info(
+        &self,
+        user_id: UserId,
+    ) -> Result<Option<AuthenticatedUserInfoDto>, AuthenticationError>;
     async fn create_authentication_link(
         &self,
         user_id: UserId,
@@ -16,17 +21,20 @@ pub trait AuthenticationPort {
     ) -> Result<InviteLink, AuthenticationError>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum AuthenticationError {
-    Error(Box<dyn std::error::Error + Send + Sync + 'static>),
+    #[error(transparent)]
+    Error(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
+    #[error("User has already been authenticated")]
     AlreadyAuthenticated,
+    #[error("User authentication request was not found")]
     AuthenticationRequestNotFound,
 }
 
-impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for AuthenticationError {
-    #[instrument(level = "trace", skip(e))]
-    fn from(e: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
-        error!(error = e, "Authentication error");
-        AuthenticationError::Error(e)
-    }
+pub struct AuthenticatedUserInfoDto {
+    pub user_id: UserId,
+    pub name: String,
+    pub email: String,
+    pub class_id: String,
+    pub authenticated_at: chrono::DateTime<chrono::Utc>,
 }

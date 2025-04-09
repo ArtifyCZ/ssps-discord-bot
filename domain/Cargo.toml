@@ -8,3 +8,4 @@ domain-shared = { path = "../domain-shared" }
 async-trait = "0.1.87"
 chrono = "0.4.40"
 tracing = "0.1"
+serde = { version = "1.0.219", features = ["derive"] }
