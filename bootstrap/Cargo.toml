@@ -24,6 +24,8 @@ oauth2 = "5.0"
 poise = "0.6"
 sentry = "0.36"
 sentry-tracing = "0.36"
+serde = "1.0"
+serde_json = "1.0"
 serenity = { version = "0.12", features = ["full"] }
 sqlx = { version = "0.8", features = [ "runtime-tokio", "tls-native-tls", "postgres"] }
 tokio = { version = "1.43", features = ["macros", "rt-multi-thread"] }

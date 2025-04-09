@@ -1,7 +1,7 @@
 use crate::locator;
 use anyhow::anyhow;
 use clap::Args;
-use domain_shared::discord::InviteLink;
+use domain_shared::discord::{InviteLink, RoleId};
 use infrastructure::oauth::{OAuthAdapter, TenantId};
 use oauth2::{ClientId, ClientSecret};
 use presentation::api::run_api;
@@ -41,6 +41,8 @@ pub struct ServeArgs {
     /// The invite link for the Discord server
     #[arg(long, env = "INVITE_LINK")]
     pub invite_link: String,
+    #[arg(long, env = "ADDITIONAL_STUDENT_ROLES")]
+    pub additional_student_roles: String,
 }
 
 #[instrument(level = "trace", skip(common_args, args))]
@@ -60,6 +62,7 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         oauth_client_secret,
         tenant_id,
         invite_link,
+        additional_student_roles,
     } = args;
     let guild = GuildId::new(guild);
     let authentication_callback_url = Url::parse(&authentication_callback_url)?;
@@ -67,6 +70,10 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
     let oauth_client_secret = ClientSecret::new(oauth_client_secret);
     let tenant_id = TenantId(tenant_id);
     let invite_link = InviteLink(invite_link);
+    let additional_student_roles = serde_json::from_str::<Vec<u64>>(&additional_student_roles)?
+        .into_iter()
+        .map(RoleId)
+        .collect();
 
     let intents = serenity::GatewayIntents::non_privileged();
 
@@ -93,6 +100,7 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         authenticated_user_repository,
         user_authentication_request_repository,
         invite_link,
+        additional_student_roles,
     ));
     let information_channel_adapter =
         Arc::new(InformationChannelService::new(discord_adapter.clone()));

@@ -2,15 +2,18 @@ mod channel_id;
 mod create_attachment;
 mod create_button;
 mod create_message;
+mod role_id;
 mod user_id;
 
 use crate::discord::channel_id::domain_to_serenity_channel_id;
 use crate::discord::create_message::domain_to_serenity_create_message;
+use crate::discord::role_id::domain_to_serenity_role_id;
 use crate::discord::user_id::domain_to_serenity_user_id;
 use async_trait::async_trait;
+use domain::authentication::create_class_user_group_id_mails;
 use domain::ports::discord::Result;
 use domain::ports::discord::{ChannelId, CreateMessage, DiscordPort};
-use domain_shared::discord::UserId;
+use domain_shared::discord::{RoleId, UserId};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::GuildId;
 use serenity::all::{Builder, Http};
@@ -56,8 +59,47 @@ impl DiscordPort for DiscordAdapter {
         Ok(())
     }
 
-    #[instrument(level = "debug", err, skip(self, user_id, class_id))]
-    async fn assign_user_to_class_role(&self, user_id: UserId, class_id: String) -> Result<()> {
+    #[instrument(level = "debug", err, skip(self, user_id, role_id, reason))]
+    async fn assign_user_to_role(
+        &self,
+        user_id: UserId,
+        role_id: RoleId,
+        reason: Option<&str>,
+    ) -> Result<()> {
+        let user_id = domain_to_serenity_user_id(user_id);
+        let role_id = domain_to_serenity_role_id(role_id);
+
+        self.client
+            .add_member_role(self.guild_id, user_id, role_id, reason)
+            .await?;
+
+        Ok(())
+    }
+
+    #[instrument(level = "debug", err, skip(self, user_id, role_id, reason))]
+    async fn remove_user_from_role(
+        &self,
+        user_id: UserId,
+        role_id: RoleId,
+        reason: Option<&str>,
+    ) -> Result<()> {
+        let user_id = domain_to_serenity_user_id(user_id);
+        let role_id = domain_to_serenity_role_id(role_id);
+
+        self.client
+            .remove_member_role(self.guild_id, user_id, role_id, reason)
+            .await?;
+
+        Ok(())
+    }
+
+    #[instrument(level = "debug", err, skip(self, user_id, class_id, reason))]
+    async fn assign_user_to_class_role(
+        &self,
+        user_id: UserId,
+        class_id: String,
+        reason: Option<&str>,
+    ) -> Result<()> {
         let user_id = domain_to_serenity_user_id(user_id);
         let class_id = class_id.to_uppercase();
 
@@ -70,13 +112,39 @@ impl DiscordPort for DiscordAdapter {
             .ok_or_else(|| format!("Role with name {} not found", class_id))?;
 
         self.client
-            .add_member_role(
-                self.guild_id,
-                user_id,
-                role.id,
-                Some("Assigned class role per authentication using Azure AD OAuth2"),
-            )
+            .add_member_role(self.guild_id, user_id, role.id, reason)
             .await?;
+
+        Ok(())
+    }
+
+    #[instrument(level = "debug", err, skip(self, user_id, reason))]
+    async fn remove_user_from_class_roles(
+        &self,
+        user_id: UserId,
+        reason: Option<&str>,
+    ) -> Result<()> {
+        let user_id = domain_to_serenity_user_id(user_id);
+
+        let class_ids: Vec<String> = create_class_user_group_id_mails()
+            .into_iter()
+            .map(|(class_id, _)| class_id)
+            .collect();
+
+        let roles = self
+            .client
+            .get_guild_roles(self.guild_id)
+            .await?
+            .into_iter()
+            .filter(|role| class_ids.contains(&role.name))
+            .map(|role| role.id)
+            .collect::<Vec<_>>();
+
+        for role in roles {
+            self.client
+                .remove_member_role(self.guild_id, user_id, role, reason)
+                .await?;
+        }
 
         Ok(())
     }
