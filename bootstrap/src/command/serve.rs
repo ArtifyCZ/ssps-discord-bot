@@ -17,7 +17,7 @@ use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUse
 use infrastructure::authentication::user_authentication_request::PostgresUserAuthenticationRequestRepository;
 use infrastructure::discord::DiscordAdapter;
 use poise::serenity_prelude as serenity;
-use tracing::instrument;
+use tracing::{info, instrument};
 
 #[derive(Args)]
 pub struct ServeArgs {
@@ -110,6 +110,8 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
 
     let api = tokio::spawn(run_api(locator.clone(), 8080));
     let bot = tokio::spawn(run_bot(locator, discord_bot_token, intents, guild));
+
+    info!("Starting API and Discord bot...");
 
     api.await?.map_err(|e| anyhow!(e))?;
     bot.await?.map_err(|e| anyhow!(e))?;
