@@ -40,6 +40,17 @@ impl Cli {
                 })
             });
 
+        tracing_subscriber::registry()
+            .with(EnvFilter::from_default_env())
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_target(true)
+                    .with_line_number(true)
+                    .with_file(true),
+            )
+            .with(sentry_tracing::layer())
+            .init();
+
         self.command.run(self.args).await
     }
 }
@@ -48,17 +59,6 @@ impl Cli {
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
-
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_target(false)
-                .with_line_number(true)
-                .with_file(true),
-        )
-        .with(sentry_tracing::layer())
-        .with(EnvFilter::from_default_env())
-        .init();
 
     let cli = Cli::parse();
 

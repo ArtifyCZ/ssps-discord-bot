@@ -5,8 +5,8 @@ public_network_name: "nginx"
 bot_env_file: "/etc/ssps-discord-bot/.env"
 discord_guild_id: "1019523857717133315"
 docker_network_name: "ssps-discord-bot"
-sentry_sample_rate: 0.1
-sentry_traces_sample_rate: 0.1
+sentry_sample_rate: 1.0
+sentry_traces_sample_rate: 1.0
 database_container_name: "ssps-discord-bot-db"
 database_container_hostname: "ssps-discord-bot-db"
 database_name: "ssps_discord_bot"
@@ -16,3 +16,4 @@ tenant_id: "354e4081-8121-4b0f-b318-c1bd2a901762"
 authentication_callback_url: "https://ssps-bot.artify.zone/oauth/callback"
 invite_link: "https://discord.com/invite/ePGN2XrkJU"
 additional_student_roles: "[1199677271041114153, 1192375658601529364, 1198989313812221962, 1205594017069539328, 1359542876492795984]"
+rust_log: "warn,application=info,application-ports=info,bootstrap=info,domain=info,domain-shared=info,infrastructure=info,presentation=info"

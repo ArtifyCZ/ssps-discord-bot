@@ -10,14 +10,14 @@ help: ## Show possible targets
 
 deploy: ## Deploy the application on production; requires publishing to GitHub's container registry first
 	@echo "Deploying the application on production"
-	@read -p "Are you sure you want to deploy the application on production? [y/N] " answer; \
+	@read -p "Are you sure you want to deploy the latest tag of application on production? [y/N] " answer; \
 	if [ "$$answer" != "y" ]; then \
 		echo "Deployment cancelled"; \
 		exit 1; \
 	fi
 	# deploy the application
 	@echo "Deploying the application on production..."
-	@ansible-playbook ansible/deploy.yaml -i ansible/inventory.yaml
+	@ansible-playbook ansible/deploy.yaml -i ansible/inventory.yaml --extra-vars "bot_image_tag=latest"
 
 cs-fix: ## Fix coding standards issues
 	@echo "Fixing coding standards issues..."
