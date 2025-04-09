@@ -45,7 +45,13 @@ pub struct ServeArgs {
 
 #[instrument(level = "trace", skip(common_args, args))]
 pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()> {
-    let CommonArgs { database_url } = common_args;
+    let CommonArgs {
+        database_url,
+        sentry_dsn: _,
+        sentry_environment: _,
+        sentry_sample_rate: _,
+        sentry_traces_sample_rate: _,
+    } = common_args;
     let ServeArgs {
         authentication_callback_url,
         discord_bot_token,

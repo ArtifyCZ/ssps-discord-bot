@@ -3,3 +3,4 @@ all:
         tux:
             ansible_host: 212.79.96.110
             ansible_user: artify
+            sentry_environment: "production"
