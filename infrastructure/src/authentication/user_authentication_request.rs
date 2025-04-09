@@ -4,12 +4,14 @@ use domain::authentication::user_authentication_request::{
 };
 use domain_shared::authentication::CsrfToken;
 use sqlx::{query, PgPool};
+use tracing::instrument;
 
 pub struct PostgresUserAuthenticationRequestRepository {
     pool: PgPool,
 }
 
 impl PostgresUserAuthenticationRequestRepository {
+    #[instrument(level = "trace", skip_all)]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -17,6 +19,7 @@ impl PostgresUserAuthenticationRequestRepository {
 
 #[async_trait]
 impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRepository {
+    #[instrument(level = "debug", err, skip(self, request))]
     async fn save(
         &self,
         request: UserAuthenticationRequest,
@@ -55,6 +58,7 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
         Ok(())
     }
 
+    #[instrument(level = "debug", err, skip(self, csrf_token))]
     async fn find_by_csrf_token(
         &self,
         csrf_token: CsrfToken,
@@ -79,6 +83,7 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
         }
     }
 
+    #[instrument(level = "debug", err, skip(self, request))]
     async fn remove(
         &self,
         request: UserAuthenticationRequest,

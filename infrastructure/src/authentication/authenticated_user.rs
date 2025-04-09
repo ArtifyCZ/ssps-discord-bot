@@ -3,6 +3,7 @@ use domain::authentication::authenticated_user::{AuthenticatedUser, Authenticate
 use domain_shared::authentication::{AccessToken, RefreshToken};
 use domain_shared::discord::UserId;
 use sqlx::{query, PgPool};
+use tracing::instrument;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -13,6 +14,7 @@ pub struct PostgresAuthenticatedUserRepository {
 }
 
 impl PostgresAuthenticatedUserRepository {
+    #[instrument(level = "trace", skip_all)]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -20,6 +22,7 @@ impl PostgresAuthenticatedUserRepository {
 
 #[async_trait]
 impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
+    #[instrument(level = "debug", err, skip(self, user))]
     async fn save(&self, user: AuthenticatedUser) -> Result<()> {
         let AuthenticatedUser {
             user_id,
@@ -60,6 +63,7 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
         Ok(())
     }
 
+    #[instrument(level = "debug", err, skip(self, user_id))]
     async fn find_by_user_id(&self, user_id: UserId) -> Result<Option<AuthenticatedUser>> {
         let row = query!(
             "SELECT user_id, access_token, refresh_token, class_id, authenticated_at FROM authenticated_users WHERE user_id = $1",

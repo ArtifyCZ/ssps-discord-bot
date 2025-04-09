@@ -1,8 +1,10 @@
 use crate::ports::discord::{CreateActionRow, CreateAttachment, CreateButton, CreateMessage};
 use crate::resources;
+use tracing::instrument;
 
 pub const VERIFY_ME_BUTTON_ID: &str = "verify_me_button";
 
+#[instrument(level = "trace", skip())]
 pub fn create_messages() -> Vec<CreateMessage> {
     vec![
         CreateMessage::default().add_file(CreateAttachment::bytes(

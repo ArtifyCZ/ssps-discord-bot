@@ -14,6 +14,7 @@ use domain_shared::authentication::{
 };
 use domain_shared::discord::UserId;
 use std::sync::Arc;
+use tracing::{info, instrument, warn, Span};
 
 pub struct AuthenticationService {
     discord_port: Arc<dyn DiscordPort + Send + Sync>,
@@ -25,6 +26,7 @@ pub struct AuthenticationService {
 }
 
 impl AuthenticationService {
+    #[instrument(level = "trace", skip_all)]
     pub fn new(
         discord_port: Arc<dyn DiscordPort + Send + Sync>,
         oauth_port: Arc<dyn OAuthPort + Send + Sync>,
@@ -46,6 +48,7 @@ impl AuthenticationService {
 
 #[async_trait]
 impl AuthenticationPort for AuthenticationService {
+    #[instrument(level = "info", skip(self))]
     async fn create_authentication_link(
         &self,
         user_id: UserId,
@@ -55,6 +58,7 @@ impl AuthenticationPort for AuthenticationService {
             .find_by_user_id(user_id)
             .await?
         {
+            info!(user_id = user_id.0, "The user tried to authenticate again");
             return Err(AuthenticationError::AlreadyAuthenticated);
         }
 
@@ -70,14 +74,33 @@ impl AuthenticationPort for AuthenticationService {
             .save(request)
             .await?;
 
+        info!(user_id = user_id.0, "Authentication link created");
+
         Ok(link)
     }
 
+    #[instrument(level = "info", skip(self, csrf_token, client_callback_token))]
     async fn confirm_authentication(
         &self,
         csrf_token: CsrfToken,
         client_callback_token: ClientCallbackToken,
     ) -> Result<InviteLink, AuthenticationError> {
+        let request = match self
+            .user_authentication_request_repository
+            .find_by_csrf_token(csrf_token.clone())
+            .await?
+        {
+            Some(request) => request,
+            None => {
+                warn!(
+                    csrf_token = csrf_token.0,
+                    "The user tried to authenticate with an invalid CSRF token",
+                );
+                return Err(AuthenticationError::AuthenticationRequestNotFound);
+            }
+        };
+        Span::current().record("user_id", request.user_id.0);
+
         let (access_token, refresh_token) = self
             .oauth_port
             .exchange_code_after_callback(client_callback_token)
@@ -90,12 +113,6 @@ impl AuthenticationPort for AuthenticationService {
             .ok_or_else(|| AuthenticationError::Error("User is not in the Class group".into()))?;
         let class_id = get_class_id(class_group)
             .ok_or_else(|| AuthenticationError::Error("User's class group ID not found".into()))?;
-
-        let request = self
-            .user_authentication_request_repository
-            .find_by_csrf_token(csrf_token)
-            .await?
-            .expect("Oauth passed but request not found");
 
         let user = AuthenticatedUser {
             user_id: request.user_id,
@@ -116,10 +133,13 @@ impl AuthenticationPort for AuthenticationService {
             .assign_user_to_class_role(user_id, class_id)
             .await?;
 
+        info!(user_id = user_id.0, "User successfully authenticated");
+
         Ok(self.invite_link.clone())
     }
 }
 
+#[instrument(level = "trace")]
 fn get_class_id(group: &UserGroup) -> Option<String> {
     if let Some(mail) = &group.mail {
         let class_group_id_mails = create_class_user_group_id_mails();
@@ -132,6 +152,7 @@ fn get_class_id(group: &UserGroup) -> Option<String> {
     }
 }
 
+#[instrument(level = "trace")]
 fn find_class_group(groups: &[UserGroup]) -> Option<&UserGroup> {
     let class_group_id_mails = create_class_user_group_id_mails();
     let class_group_mails = class_group_id_mails

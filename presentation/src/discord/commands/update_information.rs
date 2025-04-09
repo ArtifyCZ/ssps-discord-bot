@@ -2,13 +2,22 @@ use crate::application_ports::Locator;
 use crate::discord::{Context, Error};
 use application_ports::discord::ChannelId;
 use application_ports::information_channel::InformationChannelError;
+use tracing::{info, instrument};
 
 #[poise::command(
     slash_command,
     rename = "update-information",
     required_permissions = "ADMINISTRATOR"
 )]
+#[instrument(level = "info", skip(ctx))]
 pub async fn command<D: Sync + Locator>(ctx: Context<'_, D>) -> Result<(), Error> {
+    info!(
+        guild_id = ctx.guild_id().map(|id| id.get()),
+        channel_id = ctx.channel_id().get(),
+        user_id = ctx.author().id.get(),
+        "Updating information channel",
+    );
+
     let information_channel_port = ctx.data().get_information_channel_port();
     ctx.defer().await?;
 

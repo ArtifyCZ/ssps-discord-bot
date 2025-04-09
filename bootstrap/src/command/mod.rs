@@ -6,8 +6,9 @@ use crate::command::migrate::MigrateArgs;
 use crate::command::serve::ServeArgs;
 use anyhow::anyhow;
 use clap::Subcommand;
+use tracing::instrument;
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand)]
 pub enum Command {
     #[command(name = "serve")]
     Serve(#[arg(flatten)] ServeArgs),
@@ -16,6 +17,7 @@ pub enum Command {
 }
 
 impl Command {
+    #[instrument(level = "trace", skip(self, common_args))]
     pub async fn run(self, common_args: CommonArgs) -> anyhow::Result<()> {
         match self {
             Command::Serve(args) => serve::run(common_args, args).await.map_err(|e| anyhow!(e)),

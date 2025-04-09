@@ -1,6 +1,8 @@
 use domain::ports::discord::{ButtonKind, CreateButton};
 use poise::serenity_prelude as serenity;
+use tracing::instrument;
 
+#[instrument(level = "trace", skip(button))]
 pub fn domain_to_serenity_create_button(button: CreateButton) -> serenity::CreateButton {
     let CreateButton { label, data } = button;
 

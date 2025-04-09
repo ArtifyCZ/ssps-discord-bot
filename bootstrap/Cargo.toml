@@ -17,12 +17,16 @@ domain-shared = { path = "../domain-shared" }
 infrastructure = { path = "../infrastructure" }
 presentation = { path = "../presentation" }
 
-anyhow = "1.0.86"
-clap = { version = "4.5.31", features = ["derive", "env"] }
-dotenv = "0.15.0"
-oauth2 = "5.0.0"
-poise = "0.6.1"
-serenity = { version = "0.12.4", features = ["full"] }
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive", "env"] }
+dotenv = "0.15"
+oauth2 = "5.0"
+poise = "0.6"
+sentry = "0.36"
+sentry-tracing = "0.36"
+serenity = { version = "0.12", features = ["full"] }
 sqlx = { version = "0.8", features = [ "runtime-tokio", "tls-native-tls", "postgres"] }
-tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.43", features = ["macros", "rt-multi-thread"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5.0"

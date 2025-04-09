@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 #[derive(Debug)]
 pub struct CreateButton {
     pub label: String,
@@ -5,6 +7,7 @@ pub struct CreateButton {
 }
 
 impl CreateButton {
+    #[instrument(level = "trace", skip(label, button_id))]
     pub fn new(label: impl Into<String>, button_id: impl Into<String>) -> Self {
         CreateButton {
             label: label.into(),
@@ -14,6 +17,7 @@ impl CreateButton {
         }
     }
 
+    #[instrument(level = "trace", skip(label, url))]
     pub fn new_link(label: impl Into<String>, url: impl Into<String>) -> Self {
         CreateButton {
             label: label.into(),

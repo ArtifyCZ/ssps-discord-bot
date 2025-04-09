@@ -5,6 +5,8 @@ public_network_name: "nginx"
 bot_env_file: "/etc/ssps-discord-bot/.env"
 discord_guild_id: "1019523857717133315"
 docker_network_name: "ssps-discord-bot"
+sentry_sample_rate: 0.1
+sentry_traces_sample_rate: 0.1
 database_container_name: "ssps-discord-bot-db"
 database_container_hostname: "ssps-discord-bot-db"
 database_name: "ssps_discord_bot"

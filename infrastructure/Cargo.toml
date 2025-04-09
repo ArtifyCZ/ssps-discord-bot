@@ -6,10 +6,11 @@ edition = "2021"
 domain = { path = "../domain" }
 domain-shared = { path = "../domain-shared" }
 
-async-trait = "0.1.87"
-oauth2 = "5.0.0"
-poise = "0.6.1"
-reqwest = "0.12.12"
+async-trait = "0.1"
+oauth2 = "5.0"
+poise = "0.6"
+reqwest = "0.12"
 sqlx = { version = "0.8", features = [ "runtime-tokio", "tls-native-tls", "postgres", "migrate", "chrono"] }
-serde_json = "1.0.117"
-serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+tracing = "0.1"

@@ -1,9 +1,11 @@
 use crate::application_ports::Locator;
 use crate::discord::Error;
 use poise::serenity_prelude as serenity;
+use tracing::instrument;
 
 pub mod verify;
 
+#[instrument(level = "trace", skip(ctx, interaction, framework, locator))]
 pub async fn handle_button_click<L: Locator>(
     ctx: &serenity::Context,
     interaction: &serenity::ComponentInteraction,

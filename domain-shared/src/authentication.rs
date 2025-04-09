@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub struct AuthenticationLink(pub String);
 
+#[derive(Clone)]
 pub struct CsrfToken(pub String);
 
 pub struct ClientCallbackToken(pub String);
