@@ -12,7 +12,7 @@ use domain::ports::oauth::OAuthPort;
 use domain_shared::authentication::{
     AuthenticationLink, ClientCallbackToken, CsrfToken, UserGroup,
 };
-use domain_shared::discord::UserId;
+use domain_shared::discord::{RoleId, UserId};
 use std::sync::Arc;
 use tracing::{info, instrument, warn, Span};
 
@@ -23,6 +23,7 @@ pub struct AuthenticationService {
     user_authentication_request_repository:
         Arc<dyn UserAuthenticationRequestRepository + Send + Sync>,
     invite_link: InviteLink,
+    additional_student_roles: Vec<RoleId>,
 }
 
 impl AuthenticationService {
@@ -35,6 +36,7 @@ impl AuthenticationService {
             dyn UserAuthenticationRequestRepository + Send + Sync,
         >,
         invite_link: InviteLink,
+        additional_student_roles: Vec<RoleId>,
     ) -> Self {
         Self {
             discord_port,
@@ -42,6 +44,7 @@ impl AuthenticationService {
             authenticated_user_repository,
             user_authentication_request_repository,
             invite_link,
+            additional_student_roles,
         }
     }
 }
@@ -129,9 +132,25 @@ impl AuthenticationPort for AuthenticationService {
             .remove(request)
             .await?;
 
+        let audit_log_reason = "Assigned student roles by OAuth2 Azure AD authentication";
+
         self.discord_port
-            .assign_user_to_class_role(user_id, class_id)
+            .remove_user_from_class_roles(user_id, Some(audit_log_reason))
             .await?;
+        for role in &self.additional_student_roles {
+            self.discord_port
+                .remove_user_from_role(user_id, *role, Some(audit_log_reason))
+                .await?;
+        }
+
+        self.discord_port
+            .assign_user_to_class_role(user_id, class_id, Some(audit_log_reason))
+            .await?;
+        for role in &self.additional_student_roles {
+            self.discord_port
+                .assign_user_to_role(user_id, *role, Some(audit_log_reason))
+                .await?;
+        }
 
         info!(user_id = user_id.0, "User successfully authenticated");
 
