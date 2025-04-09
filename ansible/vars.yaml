@@ -9,6 +9,7 @@ sentry_sample_rate: 1.0
 sentry_traces_sample_rate: 1.0
 database_container_name: "ssps-discord-bot-db"
 database_container_hostname: "ssps-discord-bot-db"
+database_volume_path: "/var/lib/ssps-discord-bot-db"
 database_name: "ssps_discord_bot"
 database_user: "ssps_discord_bot"
 oauth_client_id: "89144b1a-dc0d-4306-9120-a4bc9c97c29e"

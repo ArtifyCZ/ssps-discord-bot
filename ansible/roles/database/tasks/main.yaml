@@ -7,6 +7,14 @@
         force_tag: yes
         tag: latest
         state: present
+-   name: Create database data directory
+    ansible.builtin.file:
+        path: "{{ database_volume_path }}"
+        state: directory
+        owner: root
+        group: root
+        mode: 0777
+    become: yes
 -   name: Create Docker network
     community.docker.docker_network:
         name: "{{ docker_network_name }}"
@@ -26,3 +34,5 @@
             POSTGRES_PASSWORD: "{{ database_password }}"
         networks:
             -   name: "{{ docker_network_name }}"
+        volumes:
+            -   "{{ database_volume_path }}:/var/lib/postgresql/data"
