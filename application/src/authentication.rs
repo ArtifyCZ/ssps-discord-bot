@@ -14,7 +14,7 @@ use domain_shared::authentication::{
 };
 use domain_shared::discord::UserId;
 use std::sync::Arc;
-use tracing::{instrument, Span};
+use tracing::{info, instrument, warn, Span};
 
 pub struct AuthenticationService {
     discord_port: Arc<dyn DiscordPort + Send + Sync>,
@@ -58,6 +58,7 @@ impl AuthenticationPort for AuthenticationService {
             .find_by_user_id(user_id)
             .await?
         {
+            info!(user_id = user_id.0, "The user tried to authenticate again");
             return Err(AuthenticationError::AlreadyAuthenticated);
         }
 
@@ -73,6 +74,8 @@ impl AuthenticationPort for AuthenticationService {
             .save(request)
             .await?;
 
+        info!(user_id = user_id.0, "Authentication link created");
+
         Ok(link)
     }
 
@@ -84,12 +87,16 @@ impl AuthenticationPort for AuthenticationService {
     ) -> Result<InviteLink, AuthenticationError> {
         let request = match self
             .user_authentication_request_repository
-            .find_by_csrf_token(csrf_token)
+            .find_by_csrf_token(csrf_token.clone())
             .await?
         {
             Some(request) => request,
             None => {
-                todo!();
+                warn!(
+                    csrf_token = csrf_token.0,
+                    "The user tried to authenticate with an invalid CSRF token",
+                );
+                return Err(AuthenticationError::AuthenticationRequestNotFound);
             }
         };
         Span::current().record("user_id", request.user_id.0);
@@ -125,6 +132,8 @@ impl AuthenticationPort for AuthenticationService {
         self.discord_port
             .assign_user_to_class_role(user_id, class_id)
             .await?;
+
+        info!(user_id = user_id.0, "User successfully authenticated");
 
         Ok(self.invite_link.clone())
     }

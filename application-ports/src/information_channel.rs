@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use domain_shared::discord::ChannelId;
-use tracing::{event, instrument, Level};
+use tracing::{error, instrument};
 
 #[async_trait]
 pub trait InformationChannelPort {
@@ -17,7 +17,7 @@ pub enum InformationChannelError {
 impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for InformationChannelError {
     #[instrument(level = "trace", skip(e))]
     fn from(e: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
-        event!(Level::ERROR, "Error: {:?}", e);
+        error!(error = e, "Information channel error");
         InformationChannelError::Error(e)
     }
 }

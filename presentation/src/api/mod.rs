@@ -1,6 +1,9 @@
 use crate::application_ports::Locator;
+use axum::extract::MatchedPath;
+use axum::http::Request;
 use axum::Router;
-use tracing::instrument;
+use tower_http::trace::TraceLayer;
+use tracing::{info_span, instrument};
 
 pub mod oauth;
 
@@ -17,7 +20,23 @@ pub async fn run_api<L: Locator + Send + Sync + Clone + 'static>(
     locator: L,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let router: Router<()> = create_router::<L>().with_state(locator);
+    let router: Router<()> = create_router::<L>()
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
+                let matched_path = request
+                    .extensions()
+                    .get::<MatchedPath>()
+                    .map(MatchedPath::as_str);
+
+                info_span!(
+                    "http_request",
+                    method = ?request.method(),
+                    matched_path,
+                    some_other_field = tracing::field::Empty,
+                )
+            }),
+        )
+        .with_state(locator);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
 
