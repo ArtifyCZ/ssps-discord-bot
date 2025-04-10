@@ -1,0 +1,3 @@
+sentry_dsn: "{{ vault_sentry_dsn }}"
+sentry_sample_rate: 1.0
+sentry_traces_sample_rate: 1.0
