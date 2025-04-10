@@ -42,28 +42,36 @@ pub async fn command<D: Sync + Locator>(
         }
     };
 
-    let reply = match user_info {
+    let embed = match user_info {
         Some(AuthenticatedUserInfoDto {
             user_id,
             name,
             email,
             class_id,
             authenticated_at,
-        }) => CreateReply::default().embed(
-            CreateEmbed::default()
-                .title("Ověřený student".to_string())
-                .thumbnail(target.face())
-                .fields(vec![
-                    ("", target.mention().to_string(), false),
-                    ("User ID", user_id.0.to_string(), false),
-                    ("Jméno", name, false),
-                    ("Email", email.to_string(), false),
-                    ("Třída", class_id, false),
-                    ("Ověřen", authenticated_at.to_rfc2822(), false),
-                ]),
-        ),
-        None => todo!(),
+        }) => CreateEmbed::default()
+            .title("Ověřený student".to_string())
+            .thumbnail(target.face())
+            .fields(vec![
+                ("", target.mention().to_string(), false),
+                ("User ID", user_id.0.to_string(), false),
+                ("Jméno", name, false),
+                ("Email", email.to_string(), false),
+                ("Třída", class_id, false),
+                ("Ověřen", authenticated_at.to_rfc2822(), false),
+            ]),
+        None => CreateEmbed::default()
+            .title("Neověřený uživatel".to_string())
+            .thumbnail(target.face())
+            .fields(vec![
+                ("", target.mention().to_string(), false),
+                ("User ID", target.id.to_string(), false),
+            ]),
     };
+    let reply = CreateReply::default()
+        .reply(true)
+        .ephemeral(true)
+        .embed(embed);
     ctx.send(reply).await?;
 
     Ok(())
