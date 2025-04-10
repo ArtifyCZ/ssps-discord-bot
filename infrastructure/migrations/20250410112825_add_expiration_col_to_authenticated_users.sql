@@ -1,0 +1,1 @@
+ALTER TABLE authenticated_users ADD COLUMN access_token_expires_at TIMESTAMP NOT NULL DEFAULT '1970-01-01 00:00:00 GMT'::TIMESTAMP;

@@ -1,4 +1,6 @@
-use application_ports::authentication::{AuthenticationError, AuthenticationPort};
+use application_ports::authentication::{
+    AuthenticatedUserInfoDto, AuthenticationError, AuthenticationPort,
+};
 use application_ports::discord::InviteLink;
 use async_trait::async_trait;
 use chrono::Utc;
@@ -52,6 +54,47 @@ impl AuthenticationService {
 #[async_trait]
 impl AuthenticationPort for AuthenticationService {
     #[instrument(level = "info", skip(self))]
+    async fn get_user_info(
+        &self,
+        user_id: UserId,
+    ) -> Result<Option<AuthenticatedUserInfoDto>, AuthenticationError> {
+        let mut user = match self
+            .authenticated_user_repository
+            .find_by_user_id(user_id)
+            .await?
+        {
+            Some(user) => user,
+            None => {
+                info!(
+                    user_id = user_id.0,
+                    "Tried to get user info of an unauthenticated user"
+                );
+                return Ok(None);
+            }
+        };
+
+        let user_info = self.oauth_port.get_user_info(&mut user).await?;
+
+        let name = user_info.name;
+        let email = user_info.email;
+        let class_id = user.class_id.clone();
+        let authenticated_at = user.authenticated_at;
+        user.name = Some(name.clone());
+        user.email = Some(email.clone());
+        self.authenticated_user_repository.save(user).await?;
+
+        info!(user_id = user_id.0, "User info retrieved successfully");
+
+        Ok(Some(AuthenticatedUserInfoDto {
+            user_id,
+            name,
+            email,
+            class_id,
+            authenticated_at,
+        }))
+    }
+
+    #[instrument(level = "info", skip(self))]
     async fn create_authentication_link(
         &self,
         user_id: UserId,
@@ -104,7 +147,7 @@ impl AuthenticationPort for AuthenticationService {
         };
         Span::current().record("user_id", request.user_id.0);
 
-        let (access_token, refresh_token) = self
+        let (access_token, access_token_expires_at, refresh_token) = self
             .oauth_port
             .exchange_code_after_callback(client_callback_token)
             .await?;
@@ -117,13 +160,19 @@ impl AuthenticationPort for AuthenticationService {
         let class_id = get_class_id(class_group)
             .ok_or_else(|| AuthenticationError::Error("User's class group ID not found".into()))?;
 
-        let user = AuthenticatedUser {
+        let mut user = AuthenticatedUser {
             user_id: request.user_id,
+            name: None,
+            email: None,
             access_token,
+            access_token_expires_at,
             refresh_token,
             class_id: class_id.clone(),
             authenticated_at: Utc::now(),
         };
+        let user_info = self.oauth_port.get_user_info(&mut user).await?;
+        user.name = Some(user_info.name);
+        user.email = Some(user_info.email);
 
         let user_id = request.user_id;
 

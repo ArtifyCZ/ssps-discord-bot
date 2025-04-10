@@ -26,7 +26,10 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
     async fn save(&self, user: AuthenticatedUser) -> Result<()> {
         let AuthenticatedUser {
             user_id,
+            name,
+            email,
             access_token,
+            access_token_expires_at,
             refresh_token,
             class_id,
             authenticated_at,
@@ -42,8 +45,11 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
         .exists;
         if let Some(true) = exists {
             query!(
-            "UPDATE authenticated_users SET access_token = $1, refresh_token = $2, class_id = $3, authenticated_at = $4 WHERE user_id = $5",
+            "UPDATE authenticated_users SET name = $1, email = $2, access_token = $3, access_token_expires_at = $4, refresh_token = $5, class_id = $6, authenticated_at = $7 WHERE user_id = $8",
+            name,
+            email,
             access_token.0,
+            access_token_expires_at.naive_utc(),
             refresh_token.0,
             class_id,
             authenticated_at.naive_utc(),
@@ -51,9 +57,12 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
             ).execute(&self.pool).await?;
         } else {
             query!(
-            "INSERT INTO authenticated_users (user_id, access_token, refresh_token, class_id, authenticated_at) VALUES ($1, $2, $3, $4, $5)",
+            "INSERT INTO authenticated_users (user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
             user_id.0 as i64,
+            name,
+            email,
             access_token.0,
+            access_token_expires_at.naive_utc(),
             refresh_token.0,
             class_id,
             authenticated_at.naive_utc(),
@@ -66,14 +75,17 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
     #[instrument(level = "debug", err, skip(self, user_id))]
     async fn find_by_user_id(&self, user_id: UserId) -> Result<Option<AuthenticatedUser>> {
         let row = query!(
-            "SELECT user_id, access_token, refresh_token, class_id, authenticated_at FROM authenticated_users WHERE user_id = $1",
+            "SELECT user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at FROM authenticated_users WHERE user_id = $1",
             user_id.0 as i64,
         ).fetch_optional(&self.pool).await?;
 
         if let Some(row) = row {
             Ok(Some(AuthenticatedUser {
                 user_id: UserId(row.user_id as u64),
+                name: row.name,
+                email: row.email,
                 access_token: AccessToken(row.access_token),
+                access_token_expires_at: row.access_token_expires_at.and_utc(),
                 refresh_token: RefreshToken(row.refresh_token),
                 class_id: row.class_id,
                 authenticated_at: row.authenticated_at.and_utc(),
