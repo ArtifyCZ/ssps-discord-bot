@@ -14,6 +14,10 @@ pub trait AuthenticationPort {
         csrf_token: CsrfToken,
         client_callback_token: ClientCallbackToken,
     ) -> Result<InviteLink, AuthenticationError>;
+    async fn get_not_verified_users(
+        &self,
+        members: Vec<UserId>,
+    ) -> Result<Vec<UserId>, AuthenticationError>;
 }
 
 #[derive(Debug)]

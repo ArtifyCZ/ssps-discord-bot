@@ -156,6 +156,27 @@ impl AuthenticationPort for AuthenticationService {
 
         Ok(self.invite_link.clone())
     }
+
+    #[instrument(level = "info", skip(self, members))]
+    async fn get_not_verified_users(
+        &self,
+        members: Vec<UserId>,
+    ) -> Result<Vec<UserId>, AuthenticationError> {
+        let mut result = vec![];
+
+        for user_id in members {
+            if self
+                .authenticated_user_repository
+                .find_by_user_id(user_id)
+                .await?
+                .is_none()
+            {
+                result.push(user_id);
+            }
+        }
+
+        Ok(result)
+    }
 }
 
 #[instrument(level = "trace")]
