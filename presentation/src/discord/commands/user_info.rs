@@ -62,7 +62,15 @@ pub async fn command<D: Sync + Locator>(
                     ("Ověřen", authenticated_at.to_rfc2822(), false),
                 ]),
         ),
-        None => todo!(),
+        None => CreateReply::default().embed(
+            CreateEmbed::default()
+                .title("Neověřený uživatel".to_string())
+                .thumbnail(target.face())
+                .fields(vec![
+                    ("", target.mention().to_string(), false),
+                    ("User ID", target.id.to_string(), false),
+                ])
+        ),
     };
     ctx.send(reply).await?;
 
