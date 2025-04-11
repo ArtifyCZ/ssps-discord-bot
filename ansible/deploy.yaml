@@ -4,6 +4,3 @@
     roles:
         -   role: database
         -   role: ssps-discord-bot
-    vars_files:
-        - vars.yaml
-        - secrets.yaml

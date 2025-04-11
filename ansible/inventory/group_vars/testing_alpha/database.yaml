@@ -1,0 +1,6 @@
+database_container_name: "ssps-discord-bot-testing-alpha-db"
+database_container_hostname: "ssps-discord-bot-testing-alpha-db"
+database_volume_path: "/var/lib/ssps-discord-bot-db-testing_alpha"
+database_name: "ssps_discord_bot"
+database_user: "ssps_discord_bot"
+database_password: "{{ vault_database_password }}"

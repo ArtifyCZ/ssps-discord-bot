@@ -8,3 +8,7 @@ all:
         production:
             hosts:
                 tux:
+
+        testing_alpha:
+            hosts:
+                tux:
