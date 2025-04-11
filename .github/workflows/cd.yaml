@@ -1,15 +1,21 @@
 name: Continuous Delivery
 on:
     workflow_dispatch:
+        inputs:
+            environment:
+                description: "Environment to deploy to"
+                required: true
+                default: "production"
+                type: environment
 
 concurrency:
-    group: production
+    group: '${{ github.event.inputs.environment }}'
     cancel-in-progress: false
 
 jobs:
     deploy:
         runs-on: ubuntu-latest
-        environment: production
+        environment: '${{ github.event.inputs.environment }}'
         steps:
             -  uses: actions/checkout@v4
             -  name: Set SSH key
@@ -22,5 +28,6 @@ jobs:
                     playbook: ansible/deploy.yaml
                     vault_password: ${{ secrets.VAULT_PASSWORD }}
                     options:
-                        --inventory ansible/inventory.yaml
+                        --inventory ansible/inventory/hosts.yaml
                         --extra-vars "bot_image_tag=sha-${{ github.sha }}"
+                        --limit ${{ github.event.inputs.environment }}

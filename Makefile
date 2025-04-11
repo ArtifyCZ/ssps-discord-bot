@@ -17,7 +17,7 @@ deploy: ## Deploy the application on production; requires publishing to GitHub's
 	fi
 	# deploy the application
 	@echo "Deploying the application on production..."
-	@ansible-playbook ansible/deploy.yaml -i ansible/inventory.yaml --extra-vars "bot_image_tag=latest"
+	@ansible-playbook ansible/deploy.yaml -i ansible/inventory.yaml --extra-vars "bot_image_tag=latest" -l production
 
 cs-fix: ## Fix coding standards issues
 	@echo "Fixing coding standards issues..."

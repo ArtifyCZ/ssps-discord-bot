@@ -1,0 +1,5 @@
+bot_image: "ghcr.io/artifycz/ssps-discord-bot/ssps-discord-bot"
+public_network_name: "nginx"
+rust_log: "warn,application=info,application-ports=info,bootstrap=info,domain=info,domain-shared=info,infrastructure=info,presentation=info"
+github_docker_registry_username: "artifycz"
+github_docker_registry_token: "{{ vault_github_docker_registry_token }}"
