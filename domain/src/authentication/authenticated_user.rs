@@ -10,12 +10,54 @@ pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct AuthenticatedUser {
-    pub user_id: UserId,
-    pub name: Option<String>,
-    pub email: Option<String>,
-    pub oauth_token: OAuthToken,
-    pub class_id: String,
-    pub authenticated_at: DateTime<Utc>,
+    user_id: UserId,
+    name: Option<String>,
+    email: Option<String>,
+    oauth_token: OAuthToken,
+    class_id: String,
+    authenticated_at: DateTime<Utc>,
+}
+
+impl AuthenticatedUser {
+    #[instrument(level = "trace", skip(self))]
+    pub fn user_id(&self) -> UserId {
+        self.user_id
+    }
+    #[instrument(level = "trace", skip(self))]
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn email(&self) -> Option<&str> {
+        self.email.as_deref()
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn set_user_info(&mut self, name: String, email: String) {
+        self.name = Some(name);
+        self.email = Some(email);
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn oauth_token(&self) -> &OAuthToken {
+        &self.oauth_token
+    }
+
+    #[instrument(level = "trace", skip(self, oauth_token))]
+    pub fn update_oauth_token(&mut self, oauth_token: OAuthToken) {
+        self.oauth_token = oauth_token;
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn class_id(&self) -> &str {
+        &self.class_id
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn authenticated_at(&self) -> DateTime<Utc> {
+        self.authenticated_at
+    }
 }
 
 #[instrument(level = "trace", skip(request, oauth_token))]

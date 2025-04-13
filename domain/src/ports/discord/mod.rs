@@ -33,7 +33,7 @@ pub trait DiscordPort {
     async fn assign_user_to_class_role(
         &self,
         user_id: UserId,
-        class_id: String,
+        class_id: &str,
         reason: Option<&str>,
     ) -> Result<()>;
     async fn remove_user_from_class_roles(

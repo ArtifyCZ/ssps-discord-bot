@@ -14,7 +14,7 @@ pub trait OAuthPort {
         &self,
         client_callback_token: ClientCallbackToken,
     ) -> Result<OAuthToken>;
-    async fn refresh_token(&self, oauth_token: OAuthToken) -> Result<OAuthToken>;
+    async fn refresh_token(&self, oauth_token: &OAuthToken) -> Result<OAuthToken>;
     async fn get_user_info(&self, access_token: &AccessToken) -> Result<UserInfoDto>;
     async fn get_user_groups(&self, access_token: &AccessToken) -> Result<Vec<UserGroup>>;
 }

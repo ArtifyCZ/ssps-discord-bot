@@ -75,25 +75,40 @@ impl AuthenticationPort for AuthenticationService {
             }
         };
 
-        if user.oauth_token.expires_at < Utc::now() {
+        if let Some(name) = user.name() {
+            if let Some(email) = user.email() {
+                info!(
+                    user_id = user_id.0,
+                    "User info already exists, returning it",
+                );
+                return Ok(Some(AuthenticatedUserInfoDto {
+                    user_id,
+                    name: name.into(),
+                    email: email.into(),
+                    class_id: user.class_id().into(),
+                    authenticated_at: user.authenticated_at(),
+                }));
+            }
+        }
+
+        if user.oauth_token().expires_at < Utc::now() {
             info!(
                 user_id = user_id.0,
                 "User's OAuth token is expired, refreshing it",
             );
-            user.oauth_token = self.oauth_port.refresh_token(user.oauth_token).await?;
+            user.update_oauth_token(self.oauth_port.refresh_token(user.oauth_token()).await?);
         }
 
         let user_info = self
             .oauth_port
-            .get_user_info(&user.oauth_token.access_token)
+            .get_user_info(&user.oauth_token().access_token)
             .await?;
 
         let name = user_info.name;
         let email = user_info.email;
-        let class_id = user.class_id.clone();
-        let authenticated_at = user.authenticated_at;
-        user.name = Some(name.clone());
-        user.email = Some(email.clone());
+        let class_id = user.class_id().into();
+        let authenticated_at = user.authenticated_at();
+        user.set_user_info(name.clone(), email.clone());
         self.authenticated_user_repository.save(&user).await?;
 
         info!(user_id = user_id.0, "User info retrieved successfully");
@@ -199,7 +214,7 @@ impl AuthenticationPort for AuthenticationService {
         }
 
         self.discord_port
-            .assign_user_to_class_role(user_id, user.class_id, Some(audit_log_reason))
+            .assign_user_to_class_role(user_id, user.class_id(), Some(audit_log_reason))
             .await?;
         for role in &self.additional_student_roles {
             self.discord_port

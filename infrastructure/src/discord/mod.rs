@@ -97,7 +97,7 @@ impl DiscordPort for DiscordAdapter {
     async fn assign_user_to_class_role(
         &self,
         user_id: UserId,
-        class_id: String,
+        class_id: &str,
         reason: Option<&str>,
     ) -> Result<()> {
         let user_id = domain_to_serenity_user_id(user_id);

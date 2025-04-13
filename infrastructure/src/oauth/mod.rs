@@ -132,7 +132,7 @@ impl OAuthPort for OAuthAdapter {
     #[instrument(level = "debug", err, skip(self, oauth_token))]
     async fn refresh_token(
         &self,
-        oauth_token: OAuthToken,
+        oauth_token: &OAuthToken,
     ) -> domain::ports::oauth::Result<OAuthToken> {
         let refresh_token = oauth2::RefreshToken::new(oauth_token.refresh_token.0.clone());
         let token_result = self
