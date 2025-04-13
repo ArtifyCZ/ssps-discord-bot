@@ -1,5 +1,7 @@
 use async_trait::async_trait;
-use domain::authentication::authenticated_user::{AuthenticatedUser, AuthenticatedUserRepository};
+use domain::authentication::authenticated_user::{
+    AuthenticatedUser, AuthenticatedUserRepository, AuthenticatedUserSnapshot,
+};
 use domain::ports::oauth::OAuthToken;
 use domain_shared::authentication::{AccessToken, RefreshToken};
 use domain_shared::discord::UserId;
@@ -25,7 +27,7 @@ impl PostgresAuthenticatedUserRepository {
 impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
     #[instrument(level = "debug", err, skip(self, user))]
     async fn save(&self, user: &AuthenticatedUser) -> Result<()> {
-        let AuthenticatedUser {
+        let AuthenticatedUserSnapshot {
             user_id,
             name,
             email,
@@ -37,7 +39,7 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
                 },
             class_id,
             authenticated_at,
-        } = user;
+        } = user.to_snapshot();
 
         // Check if the user already exists
         let exists = query!(
@@ -84,18 +86,20 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
         ).fetch_optional(&self.pool).await?;
 
         if let Some(row) = row {
-            Ok(Some(AuthenticatedUser {
-                user_id: UserId(row.user_id as u64),
-                name: row.name,
-                email: row.email,
-                oauth_token: OAuthToken {
-                    access_token: AccessToken(row.access_token),
-                    expires_at: row.access_token_expires_at.and_utc(),
-                    refresh_token: RefreshToken(row.refresh_token),
+            Ok(Some(AuthenticatedUser::from_snapshot(
+                AuthenticatedUserSnapshot {
+                    user_id: UserId(row.user_id as u64),
+                    name: row.name,
+                    email: row.email,
+                    oauth_token: OAuthToken {
+                        access_token: AccessToken(row.access_token),
+                        expires_at: row.access_token_expires_at.and_utc(),
+                        refresh_token: RefreshToken(row.refresh_token),
+                    },
+                    class_id: row.class_id,
+                    authenticated_at: row.authenticated_at.and_utc(),
                 },
-                class_id: row.class_id,
-                authenticated_at: row.authenticated_at.and_utc(),
-            }))
+            )))
         } else {
             Ok(None)
         }
