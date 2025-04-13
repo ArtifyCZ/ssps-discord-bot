@@ -7,7 +7,7 @@ use chrono::Utc;
 use domain::authentication::authenticated_user::{AuthenticatedUser, AuthenticatedUserRepository};
 use domain::authentication::create_class_user_group_id_mails;
 use domain::authentication::user_authentication_request::{
-    UserAuthenticationRequest, UserAuthenticationRequestRepository,
+    create_user_authentication_request, UserAuthenticationRequestRepository,
 };
 use domain::ports::discord::DiscordPort;
 use domain::ports::oauth::OAuthPort;
@@ -121,11 +121,7 @@ impl AuthenticationPort for AuthenticationService {
 
         let (link, csrf_token) = self.oauth_port.create_authentication_link().await?;
 
-        let request = UserAuthenticationRequest {
-            csrf_token,
-            user_id,
-            requested_at: Utc::now(),
-        };
+        let request = create_user_authentication_request(csrf_token, user_id);
 
         self.user_authentication_request_repository
             .save(&request)

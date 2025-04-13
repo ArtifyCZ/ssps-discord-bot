@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use tracing::instrument;
 use domain_shared::authentication::CsrfToken;
 use domain_shared::discord::UserId;
 
@@ -11,6 +12,18 @@ pub struct UserAuthenticationRequest {
     pub csrf_token: CsrfToken,
     pub user_id: UserId,
     pub requested_at: DateTime<Utc>,
+}
+
+#[instrument(level = "trace", skip(csrf_token))]
+pub fn create_user_authentication_request(
+    csrf_token: CsrfToken,
+    user_id: UserId,
+) -> UserAuthenticationRequest {
+    UserAuthenticationRequest {
+        csrf_token,
+        user_id,
+        requested_at: Utc::now(),
+    }
 }
 
 #[async_trait]
