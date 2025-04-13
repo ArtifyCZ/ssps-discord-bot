@@ -18,6 +18,6 @@ pub struct AuthenticatedUser {
 
 #[async_trait]
 pub trait AuthenticatedUserRepository {
-    async fn save(&self, user: AuthenticatedUser) -> Result<()>;
+    async fn save(&self, user: &AuthenticatedUser) -> Result<()>;
     async fn find_by_user_id(&self, user_id: UserId) -> Result<Option<AuthenticatedUser>>;
 }

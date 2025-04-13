@@ -15,10 +15,10 @@ pub struct UserAuthenticationRequest {
 
 #[async_trait]
 pub trait UserAuthenticationRequestRepository {
-    async fn save(&self, request: UserAuthenticationRequest) -> Result<()>;
+    async fn save(&self, request: &UserAuthenticationRequest) -> Result<()>;
     async fn find_by_csrf_token(
         &self,
-        csrf_token: CsrfToken,
+        csrf_token: &CsrfToken,
     ) -> Result<Option<UserAuthenticationRequest>>;
-    async fn remove(&self, request: UserAuthenticationRequest) -> Result<()>;
+    async fn remove_by_csrf_token(&self, csrf_token: &CsrfToken) -> Result<()>;
 }

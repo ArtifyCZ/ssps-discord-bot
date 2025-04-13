@@ -6,6 +6,11 @@ use domain_shared::authentication::CsrfToken;
 use sqlx::{query, PgPool};
 use tracing::instrument;
 
+pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+
+pub type Result<T> =
+    std::result::Result<T, domain::authentication::user_authentication_request::Error>;
+
 pub struct PostgresUserAuthenticationRequestRepository {
     pool: PgPool,
 }
@@ -20,10 +25,7 @@ impl PostgresUserAuthenticationRequestRepository {
 #[async_trait]
 impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRepository {
     #[instrument(level = "debug", err, skip(self, request))]
-    async fn save(
-        &self,
-        request: UserAuthenticationRequest,
-    ) -> domain::authentication::user_authentication_request::Result<()> {
+    async fn save(&self, request: &UserAuthenticationRequest) -> Result<()> {
         let UserAuthenticationRequest {
             csrf_token,
             user_id,
@@ -61,7 +63,7 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
     #[instrument(level = "debug", err, skip(self, csrf_token))]
     async fn find_by_csrf_token(
         &self,
-        csrf_token: CsrfToken,
+        csrf_token: &CsrfToken,
     ) -> domain::authentication::user_authentication_request::Result<
         Option<UserAuthenticationRequest>,
     > {
@@ -83,17 +85,11 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
         }
     }
 
-    #[instrument(level = "debug", err, skip(self, request))]
-    async fn remove(
+    #[instrument(level = "debug", err, skip(self, csrf_token))]
+    async fn remove_by_csrf_token(
         &self,
-        request: UserAuthenticationRequest,
+        csrf_token: &CsrfToken,
     ) -> domain::authentication::user_authentication_request::Result<()> {
-        let UserAuthenticationRequest {
-            csrf_token,
-            user_id: _,
-            requested_at: _,
-        } = request;
-
         query!(
             "DELETE FROM user_authentication_requests WHERE csrf_token = $1",
             csrf_token.0,

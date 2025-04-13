@@ -92,7 +92,7 @@ impl AuthenticationPort for AuthenticationService {
         let authenticated_at = user.authenticated_at;
         user.name = Some(name.clone());
         user.email = Some(email.clone());
-        self.authenticated_user_repository.save(user).await?;
+        self.authenticated_user_repository.save(&user).await?;
 
         info!(user_id = user_id.0, "User info retrieved successfully");
 
@@ -128,7 +128,7 @@ impl AuthenticationPort for AuthenticationService {
         };
 
         self.user_authentication_request_repository
-            .save(request)
+            .save(&request)
             .await?;
 
         info!(user_id = user_id.0, "Authentication link created");
@@ -144,7 +144,7 @@ impl AuthenticationPort for AuthenticationService {
     ) -> Result<InviteLink, AuthenticationError> {
         let request = match self
             .user_authentication_request_repository
-            .find_by_csrf_token(csrf_token.clone())
+            .find_by_csrf_token(&csrf_token)
             .await?
         {
             Some(request) => request,
@@ -186,9 +186,9 @@ impl AuthenticationPort for AuthenticationService {
 
         let user_id = request.user_id;
 
-        self.authenticated_user_repository.save(user).await?;
+        self.authenticated_user_repository.save(&user).await?;
         self.user_authentication_request_repository
-            .remove(request)
+            .remove_by_csrf_token(&request.csrf_token)
             .await?;
 
         let audit_log_reason = "Assigned student roles by OAuth2 Azure AD authentication";

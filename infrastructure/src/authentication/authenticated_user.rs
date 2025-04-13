@@ -24,7 +24,7 @@ impl PostgresAuthenticatedUserRepository {
 #[async_trait]
 impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
     #[instrument(level = "debug", err, skip(self, user))]
-    async fn save(&self, user: AuthenticatedUser) -> Result<()> {
+    async fn save(&self, user: &AuthenticatedUser) -> Result<()> {
         let AuthenticatedUser {
             user_id,
             name,
@@ -50,8 +50,8 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
         if let Some(true) = exists {
             query!(
             "UPDATE authenticated_users SET name = $1, email = $2, access_token = $3, access_token_expires_at = $4, refresh_token = $5, class_id = $6, authenticated_at = $7 WHERE user_id = $8",
-            name,
-            email,
+            name.clone(),
+            email.clone(),
             access_token.0,
             access_token_expires_at.naive_utc(),
             refresh_token.0,
@@ -63,8 +63,8 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
             query!(
             "INSERT INTO authenticated_users (user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
             user_id.0 as i64,
-            name,
-            email,
+            name.clone(),
+            email.clone(),
             access_token.0,
             access_token_expires_at.naive_utc(),
             refresh_token.0,
