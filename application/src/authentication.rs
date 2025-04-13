@@ -4,7 +4,9 @@ use application_ports::authentication::{
 use application_ports::discord::InviteLink;
 use async_trait::async_trait;
 use chrono::Utc;
-use domain::authentication::authenticated_user::{AuthenticatedUser, AuthenticatedUserRepository};
+use domain::authentication::authenticated_user::{
+    create_user_from_successful_authentication, AuthenticatedUserRepository,
+};
 use domain::authentication::create_class_user_group_id_mails;
 use domain::authentication::user_authentication_request::{
     create_user_authentication_request, UserAuthenticationRequestRepository,
@@ -172,14 +174,13 @@ impl AuthenticationPort for AuthenticationService {
             .get_user_info(&oauth_token.access_token)
             .await?;
 
-        let user = AuthenticatedUser {
-            user_id,
-            name: Some(user_info.name),
-            email: Some(user_info.email),
+        let user = create_user_from_successful_authentication(
+            &request,
+            user_info.name,
+            user_info.email,
             oauth_token,
-            class_id: class_id.clone(),
-            authenticated_at: Utc::now(),
-        };
+            class_id,
+        );
 
         self.authenticated_user_repository.save(&user).await?;
         self.user_authentication_request_repository
@@ -198,7 +199,7 @@ impl AuthenticationPort for AuthenticationService {
         }
 
         self.discord_port
-            .assign_user_to_class_role(user_id, class_id, Some(audit_log_reason))
+            .assign_user_to_class_role(user_id, user.class_id, Some(audit_log_reason))
             .await?;
         for role in &self.additional_student_roles {
             self.discord_port

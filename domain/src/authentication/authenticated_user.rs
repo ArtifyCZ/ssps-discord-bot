@@ -1,6 +1,8 @@
+use crate::authentication::user_authentication_request::UserAuthenticationRequest;
 use crate::ports::oauth::OAuthToken;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use tracing::instrument;
 use domain_shared::discord::UserId;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -14,6 +16,24 @@ pub struct AuthenticatedUser {
     pub oauth_token: OAuthToken,
     pub class_id: String,
     pub authenticated_at: DateTime<Utc>,
+}
+
+#[instrument(level = "trace", skip(request, oauth_token))]
+pub fn create_user_from_successful_authentication(
+    request: &UserAuthenticationRequest,
+    name: String,
+    email: String,
+    oauth_token: OAuthToken,
+    class_id: String,
+) -> AuthenticatedUser {
+    AuthenticatedUser {
+        user_id: request.user_id(),
+        name: Some(name),
+        email: Some(email),
+        oauth_token,
+        class_id,
+        authenticated_at: Utc::now(),
+    }
 }
 
 #[async_trait]
