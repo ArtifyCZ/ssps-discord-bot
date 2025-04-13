@@ -9,9 +9,9 @@ pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct UserAuthenticationRequest {
-    pub csrf_token: CsrfToken,
-    pub user_id: UserId,
-    pub requested_at: DateTime<Utc>,
+    csrf_token: CsrfToken,
+    user_id: UserId,
+    requested_at: DateTime<Utc>,
 }
 
 #[instrument(level = "trace", skip(csrf_token))]
@@ -23,6 +23,23 @@ pub fn create_user_authentication_request(
         csrf_token,
         user_id,
         requested_at: Utc::now(),
+    }
+}
+
+impl UserAuthenticationRequest {
+    #[instrument(level = "trace", skip(self))]
+    pub fn csrf_token(&self) -> &CsrfToken {
+        &self.csrf_token
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn user_id(&self) -> UserId {
+        self.user_id
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn requested_at(&self) -> DateTime<Utc> {
+        self.requested_at
     }
 }
 

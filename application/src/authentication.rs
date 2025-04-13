@@ -152,7 +152,8 @@ impl AuthenticationPort for AuthenticationService {
                 return Err(AuthenticationError::AuthenticationRequestNotFound);
             }
         };
-        Span::current().record("user_id", request.user_id.0);
+        let user_id = request.user_id();
+        Span::current().record("user_id", user_id.0);
 
         let oauth_token = self
             .oauth_port
@@ -172,7 +173,7 @@ impl AuthenticationPort for AuthenticationService {
             .await?;
 
         let user = AuthenticatedUser {
-            user_id: request.user_id,
+            user_id,
             name: Some(user_info.name),
             email: Some(user_info.email),
             oauth_token,
@@ -180,11 +181,9 @@ impl AuthenticationPort for AuthenticationService {
             authenticated_at: Utc::now(),
         };
 
-        let user_id = request.user_id;
-
         self.authenticated_user_repository.save(&user).await?;
         self.user_authentication_request_repository
-            .remove_by_csrf_token(&request.csrf_token)
+            .remove_by_csrf_token(request.csrf_token())
             .await?;
 
         let audit_log_reason = "Assigned student roles by OAuth2 Azure AD authentication";
