@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use tracing::instrument;
 use domain_shared::authentication::CsrfToken;
 use domain_shared::discord::UserId;
+use tracing::instrument;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -24,6 +24,32 @@ pub fn create_user_authentication_request(
         user_id,
         requested_at: Utc::now(),
     }
+}
+
+impl UserAuthenticationRequest {
+    #[instrument(level = "trace", skip(snapshot))]
+    pub fn from_snapshot(snapshot: UserAuthenticationRequestSnapshot) -> Self {
+        Self {
+            csrf_token: snapshot.csrf_token,
+            user_id: snapshot.user_id,
+            requested_at: snapshot.requested_at,
+        }
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn to_snapshot(&self) -> UserAuthenticationRequestSnapshot {
+        UserAuthenticationRequestSnapshot {
+            csrf_token: self.csrf_token.clone(),
+            user_id: self.user_id,
+            requested_at: self.requested_at,
+        }
+    }
+}
+
+pub struct UserAuthenticationRequestSnapshot {
+    pub csrf_token: CsrfToken,
+    pub user_id: UserId,
+    pub requested_at: DateTime<Utc>,
 }
 
 #[async_trait]

@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use domain::authentication::user_authentication_request::{
     UserAuthenticationRequest, UserAuthenticationRequestRepository,
+    UserAuthenticationRequestSnapshot,
 };
 use domain_shared::authentication::CsrfToken;
 use sqlx::{query, PgPool};
@@ -26,11 +27,11 @@ impl PostgresUserAuthenticationRequestRepository {
 impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRepository {
     #[instrument(level = "debug", err, skip(self, request))]
     async fn save(&self, request: &UserAuthenticationRequest) -> Result<()> {
-        let UserAuthenticationRequest {
+        let UserAuthenticationRequestSnapshot {
             csrf_token,
             user_id,
             requested_at,
-        } = request;
+        } = request.to_snapshot();
 
         // Check if the request already exists
         let exists = query!(
@@ -75,11 +76,13 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
         .await?;
 
         if let Some(row) = row {
-            Ok(Some(UserAuthenticationRequest {
-                csrf_token: CsrfToken(row.csrf_token),
-                user_id: domain_shared::discord::UserId(row.user_id as u64),
-                requested_at: row.requested_at.and_utc(),
-            }))
+            Ok(Some(UserAuthenticationRequest::from_snapshot(
+                UserAuthenticationRequestSnapshot {
+                    csrf_token: CsrfToken(row.csrf_token),
+                    user_id: domain_shared::discord::UserId(row.user_id as u64),
+                    requested_at: row.requested_at.and_utc(),
+                },
+            )))
         } else {
             Ok(None)
         }
