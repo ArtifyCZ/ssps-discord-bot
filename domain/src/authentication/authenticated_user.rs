@@ -1,6 +1,6 @@
+use crate::ports::oauth::OAuthToken;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use domain_shared::authentication::{AccessToken, RefreshToken};
 use domain_shared::discord::UserId;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -11,9 +11,7 @@ pub struct AuthenticatedUser {
     pub user_id: UserId,
     pub name: Option<String>,
     pub email: Option<String>,
-    pub access_token: AccessToken,
-    pub access_token_expires_at: DateTime<Utc>,
-    pub refresh_token: RefreshToken,
+    pub oauth_token: OAuthToken,
     pub class_id: String,
     pub authenticated_at: DateTime<Utc>,
 }

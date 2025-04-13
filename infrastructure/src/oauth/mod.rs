@@ -5,8 +5,7 @@ use crate::oauth::authentication_link::oauth_to_domain_authentication_link;
 use crate::oauth::csrf_token::oauth_to_domain_csrf_token;
 use async_trait::async_trait;
 use chrono::Utc;
-use domain::authentication::authenticated_user::AuthenticatedUser;
-use domain::ports::oauth::{OAuthPort, UserInfoDto};
+use domain::ports::oauth::{OAuthPort, OAuthToken, UserInfoDto};
 use domain_shared::authentication::{
     AccessToken, AuthenticationLink, ClientCallbackToken, CsrfToken, RefreshToken, UserGroup,
 };
@@ -21,7 +20,6 @@ use oauth2::{
 };
 use reqwest::Client as HttpClient;
 use serde::Deserialize;
-use sqlx::types::chrono::DateTime;
 use std::time::Duration;
 use tracing::instrument;
 
@@ -81,35 +79,6 @@ impl OAuthAdapter {
             http_client,
         }
     }
-
-    #[instrument(level = "debug", err, skip(self, user))]
-    async fn refresh_token(
-        &self,
-        user: &mut AuthenticatedUser,
-    ) -> domain::ports::oauth::Result<()> {
-        let refresh_token = oauth2::RefreshToken::new(user.refresh_token.0.clone());
-        let token_result = self
-            .oauth_client
-            .exchange_refresh_token(&refresh_token)
-            .request_async(&self.http_client)
-            .await?;
-
-        user.access_token = AccessToken(token_result.access_token().secret().clone());
-        user.access_token_expires_at = Utc::now()
-            + token_result
-                .expires_in()
-                .map(|d| d - Duration::from_secs(30))
-                .unwrap_or(Duration::from_secs(300));
-        user.refresh_token = RefreshToken(
-            token_result
-                .refresh_token()
-                .expect("New refresh token should be present")
-                .secret()
-                .clone(),
-        );
-
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -136,7 +105,7 @@ impl OAuthPort for OAuthAdapter {
     async fn exchange_code_after_callback(
         &self,
         client_callback_token: ClientCallbackToken,
-    ) -> domain::ports::oauth::Result<(AccessToken, DateTime<Utc>, RefreshToken)> {
+    ) -> domain::ports::oauth::Result<OAuthToken> {
         let token_result = self
             .oauth_client
             .exchange_code(AuthorizationCode::new(client_callback_token.0))
@@ -153,26 +122,55 @@ impl OAuthPort for OAuthAdapter {
             .expect("Refresh token should be present")
             .secret()
             .clone();
-        Ok((
-            AccessToken(access_token),
+        Ok(OAuthToken {
+            access_token: AccessToken(access_token),
             expires_at,
-            RefreshToken(refresh_token),
-        ))
+            refresh_token: RefreshToken(refresh_token),
+        })
     }
 
-    #[instrument(level = "debug", err, skip(self, user))]
+    #[instrument(level = "debug", err, skip(self, oauth_token))]
+    async fn refresh_token(
+        &self,
+        oauth_token: OAuthToken,
+    ) -> domain::ports::oauth::Result<OAuthToken> {
+        let refresh_token = oauth2::RefreshToken::new(oauth_token.refresh_token.0.clone());
+        let token_result = self
+            .oauth_client
+            .exchange_refresh_token(&refresh_token)
+            .request_async(&self.http_client)
+            .await?;
+
+        let access_token = AccessToken(token_result.access_token().secret().clone());
+        let expires_at = Utc::now()
+            + token_result
+                .expires_in()
+                .map(|d| d - Duration::from_secs(30))
+                .unwrap_or(Duration::from_secs(300));
+        let refresh_token = RefreshToken(
+            token_result
+                .refresh_token()
+                .expect("New refresh token should be present")
+                .secret()
+                .clone(),
+        );
+
+        Ok(OAuthToken {
+            access_token,
+            expires_at,
+            refresh_token,
+        })
+    }
+
+    #[instrument(level = "debug", err, skip(self, access_token))]
     async fn get_user_info(
         &self,
-        user: &mut AuthenticatedUser,
+        access_token: &AccessToken,
     ) -> domain::ports::oauth::Result<UserInfoDto> {
-        if user.access_token_expires_at < Utc::now() {
-            self.refresh_token(user).await?;
-        }
-
         let user_info = self
             .http_client
             .get("https://graph.microsoft.com/v1.0/me")
-            .bearer_auth(user.access_token.0.clone())
+            .bearer_auth(access_token.0.clone())
             .send()
             .await?
             .text()
@@ -185,12 +183,12 @@ impl OAuthPort for OAuthAdapter {
     #[instrument(level = "debug", err, skip(self, access_token))]
     async fn get_user_groups(
         &self,
-        access_token: AccessToken,
+        access_token: &AccessToken,
     ) -> domain::ports::oauth::Result<Vec<UserGroup>> {
         let user_info = self
             .http_client
             .get("https://graph.microsoft.com/v1.0/me/memberOf")
-            .bearer_auth(access_token.0)
+            .bearer_auth(access_token.0.clone())
             .send()
             .await?
             .text()

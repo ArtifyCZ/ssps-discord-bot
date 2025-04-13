@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use domain::authentication::authenticated_user::{AuthenticatedUser, AuthenticatedUserRepository};
+use domain::ports::oauth::OAuthToken;
 use domain_shared::authentication::{AccessToken, RefreshToken};
 use domain_shared::discord::UserId;
 use sqlx::{query, PgPool};
@@ -28,9 +29,12 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
             user_id,
             name,
             email,
-            access_token,
-            access_token_expires_at,
-            refresh_token,
+            oauth_token:
+                OAuthToken {
+                    access_token,
+                    expires_at: access_token_expires_at,
+                    refresh_token,
+                },
             class_id,
             authenticated_at,
         } = user;
@@ -84,9 +88,11 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
                 user_id: UserId(row.user_id as u64),
                 name: row.name,
                 email: row.email,
-                access_token: AccessToken(row.access_token),
-                access_token_expires_at: row.access_token_expires_at.and_utc(),
-                refresh_token: RefreshToken(row.refresh_token),
+                oauth_token: OAuthToken {
+                    access_token: AccessToken(row.access_token),
+                    expires_at: row.access_token_expires_at.and_utc(),
+                    refresh_token: RefreshToken(row.refresh_token),
+                },
                 class_id: row.class_id,
                 authenticated_at: row.authenticated_at.and_utc(),
             }))
