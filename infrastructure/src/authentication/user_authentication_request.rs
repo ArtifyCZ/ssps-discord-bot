@@ -1,10 +1,16 @@
 use async_trait::async_trait;
 use domain::authentication::user_authentication_request::{
     UserAuthenticationRequest, UserAuthenticationRequestRepository,
+    UserAuthenticationRequestSnapshot,
 };
 use domain_shared::authentication::CsrfToken;
 use sqlx::{query, PgPool};
 use tracing::instrument;
+
+pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+
+pub type Result<T> =
+    std::result::Result<T, domain::authentication::user_authentication_request::Error>;
 
 pub struct PostgresUserAuthenticationRequestRepository {
     pool: PgPool,
@@ -20,15 +26,12 @@ impl PostgresUserAuthenticationRequestRepository {
 #[async_trait]
 impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRepository {
     #[instrument(level = "debug", err, skip(self, request))]
-    async fn save(
-        &self,
-        request: UserAuthenticationRequest,
-    ) -> domain::authentication::user_authentication_request::Result<()> {
-        let UserAuthenticationRequest {
+    async fn save(&self, request: &UserAuthenticationRequest) -> Result<()> {
+        let UserAuthenticationRequestSnapshot {
             csrf_token,
             user_id,
             requested_at,
-        } = request;
+        } = request.to_snapshot();
 
         // Check if the request already exists
         let exists = query!(
@@ -61,7 +64,7 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
     #[instrument(level = "debug", err, skip(self, csrf_token))]
     async fn find_by_csrf_token(
         &self,
-        csrf_token: CsrfToken,
+        csrf_token: &CsrfToken,
     ) -> domain::authentication::user_authentication_request::Result<
         Option<UserAuthenticationRequest>,
     > {
@@ -73,27 +76,23 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
         .await?;
 
         if let Some(row) = row {
-            Ok(Some(UserAuthenticationRequest {
-                csrf_token: CsrfToken(row.csrf_token),
-                user_id: domain_shared::discord::UserId(row.user_id as u64),
-                requested_at: row.requested_at.and_utc(),
-            }))
+            Ok(Some(UserAuthenticationRequest::from_snapshot(
+                UserAuthenticationRequestSnapshot {
+                    csrf_token: CsrfToken(row.csrf_token),
+                    user_id: domain_shared::discord::UserId(row.user_id as u64),
+                    requested_at: row.requested_at.and_utc(),
+                },
+            )))
         } else {
             Ok(None)
         }
     }
 
-    #[instrument(level = "debug", err, skip(self, request))]
-    async fn remove(
+    #[instrument(level = "debug", err, skip(self, csrf_token))]
+    async fn remove_by_csrf_token(
         &self,
-        request: UserAuthenticationRequest,
+        csrf_token: &CsrfToken,
     ) -> domain::authentication::user_authentication_request::Result<()> {
-        let UserAuthenticationRequest {
-            csrf_token,
-            user_id: _,
-            requested_at: _,
-        } = request;
-
         query!(
             "DELETE FROM user_authentication_requests WHERE csrf_token = $1",
             csrf_token.0,

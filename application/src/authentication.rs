@@ -4,10 +4,12 @@ use application_ports::authentication::{
 use application_ports::discord::InviteLink;
 use async_trait::async_trait;
 use chrono::Utc;
-use domain::authentication::authenticated_user::{AuthenticatedUser, AuthenticatedUserRepository};
+use domain::authentication::authenticated_user::{
+    create_user_from_successful_authentication, AuthenticatedUserRepository,
+};
 use domain::authentication::create_class_user_group_id_mails;
 use domain::authentication::user_authentication_request::{
-    UserAuthenticationRequest, UserAuthenticationRequestRepository,
+    create_user_authentication_request, UserAuthenticationRequestRepository,
 };
 use domain::ports::discord::DiscordPort;
 use domain::ports::oauth::OAuthPort;
@@ -73,15 +75,41 @@ impl AuthenticationPort for AuthenticationService {
             }
         };
 
-        let user_info = self.oauth_port.get_user_info(&mut user).await?;
+        if let Some(name) = user.name() {
+            if let Some(email) = user.email() {
+                info!(
+                    user_id = user_id.0,
+                    "User info already exists, returning it",
+                );
+                return Ok(Some(AuthenticatedUserInfoDto {
+                    user_id,
+                    name: name.into(),
+                    email: email.into(),
+                    class_id: user.class_id().into(),
+                    authenticated_at: user.authenticated_at(),
+                }));
+            }
+        }
+
+        if user.oauth_token().expires_at < Utc::now() {
+            info!(
+                user_id = user_id.0,
+                "User's OAuth token is expired, refreshing it",
+            );
+            user.update_oauth_token(self.oauth_port.refresh_token(user.oauth_token()).await?);
+        }
+
+        let user_info = self
+            .oauth_port
+            .get_user_info(&user.oauth_token().access_token)
+            .await?;
 
         let name = user_info.name;
         let email = user_info.email;
-        let class_id = user.class_id.clone();
-        let authenticated_at = user.authenticated_at;
-        user.name = Some(name.clone());
-        user.email = Some(email.clone());
-        self.authenticated_user_repository.save(user).await?;
+        let class_id = user.class_id().into();
+        let authenticated_at = user.authenticated_at();
+        user.set_user_info(name.clone(), email.clone());
+        self.authenticated_user_repository.save(&user).await?;
 
         info!(user_id = user_id.0, "User info retrieved successfully");
 
@@ -110,14 +138,10 @@ impl AuthenticationPort for AuthenticationService {
 
         let (link, csrf_token) = self.oauth_port.create_authentication_link().await?;
 
-        let request = UserAuthenticationRequest {
-            csrf_token,
-            user_id,
-            requested_at: Utc::now(),
-        };
+        let request = create_user_authentication_request(csrf_token, user_id);
 
         self.user_authentication_request_repository
-            .save(request)
+            .save(&request)
             .await?;
 
         info!(user_id = user_id.0, "Authentication link created");
@@ -133,7 +157,7 @@ impl AuthenticationPort for AuthenticationService {
     ) -> Result<InviteLink, AuthenticationError> {
         let request = match self
             .user_authentication_request_repository
-            .find_by_csrf_token(csrf_token.clone())
+            .find_by_csrf_token(&csrf_token)
             .await?
         {
             Some(request) => request,
@@ -145,40 +169,37 @@ impl AuthenticationPort for AuthenticationService {
                 return Err(AuthenticationError::AuthenticationRequestNotFound);
             }
         };
-        Span::current().record("user_id", request.user_id.0);
+        let user_id = request.user_id();
+        Span::current().record("user_id", user_id.0);
 
-        let (access_token, access_token_expires_at, refresh_token) = self
+        let oauth_token = self
             .oauth_port
             .exchange_code_after_callback(client_callback_token)
             .await?;
         let groups = self
             .oauth_port
-            .get_user_groups(access_token.clone())
+            .get_user_groups(&oauth_token.access_token)
             .await?;
         let class_group = find_class_group(&groups)
             .ok_or_else(|| AuthenticationError::Error("User is not in the Class group".into()))?;
         let class_id = get_class_id(class_group)
             .ok_or_else(|| AuthenticationError::Error("User's class group ID not found".into()))?;
+        let user_info = self
+            .oauth_port
+            .get_user_info(&oauth_token.access_token)
+            .await?;
 
-        let mut user = AuthenticatedUser {
-            user_id: request.user_id,
-            name: None,
-            email: None,
-            access_token,
-            access_token_expires_at,
-            refresh_token,
-            class_id: class_id.clone(),
-            authenticated_at: Utc::now(),
-        };
-        let user_info = self.oauth_port.get_user_info(&mut user).await?;
-        user.name = Some(user_info.name);
-        user.email = Some(user_info.email);
+        let user = create_user_from_successful_authentication(
+            &request,
+            user_info.name,
+            user_info.email,
+            oauth_token,
+            class_id,
+        );
 
-        let user_id = request.user_id;
-
-        self.authenticated_user_repository.save(user).await?;
+        self.authenticated_user_repository.save(&user).await?;
         self.user_authentication_request_repository
-            .remove(request)
+            .remove_by_csrf_token(request.csrf_token())
             .await?;
 
         let audit_log_reason = "Assigned student roles by OAuth2 Azure AD authentication";
@@ -193,7 +214,7 @@ impl AuthenticationPort for AuthenticationService {
         }
 
         self.discord_port
-            .assign_user_to_class_role(user_id, class_id, Some(audit_log_reason))
+            .assign_user_to_class_role(user_id, user.class_id(), Some(audit_log_reason))
             .await?;
         for role in &self.additional_student_roles {
             self.discord_port

@@ -41,7 +41,7 @@
         state: started
         pull: never
         recreate: true
-        restart_policy: no
+        restart_policy: "no"
         volumes:
             - "{{ bot_env_file }}:/app/.env"
         networks:
@@ -58,7 +58,7 @@
         state: started
         pull: never
         recreate: true
-        restart_policy: always
+        restart_policy: "unless-stopped"
         volumes:
             - "{{ bot_env_file }}:/app/.env"
         networks:

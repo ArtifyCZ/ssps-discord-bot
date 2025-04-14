@@ -1,4 +1,3 @@
-use crate::authentication::authenticated_user::AuthenticatedUser;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use domain_shared::authentication::{
@@ -14,9 +13,17 @@ pub trait OAuthPort {
     async fn exchange_code_after_callback(
         &self,
         client_callback_token: ClientCallbackToken,
-    ) -> Result<(AccessToken, DateTime<Utc>, RefreshToken)>;
-    async fn get_user_info(&self, user: &mut AuthenticatedUser) -> Result<UserInfoDto>;
-    async fn get_user_groups(&self, access_token: AccessToken) -> Result<Vec<UserGroup>>;
+    ) -> Result<OAuthToken>;
+    async fn refresh_token(&self, oauth_token: &OAuthToken) -> Result<OAuthToken>;
+    async fn get_user_info(&self, access_token: &AccessToken) -> Result<UserInfoDto>;
+    async fn get_user_groups(&self, access_token: &AccessToken) -> Result<Vec<UserGroup>>;
+}
+
+#[derive(Clone)]
+pub struct OAuthToken {
+    pub access_token: AccessToken,
+    pub expires_at: DateTime<Utc>,
+    pub refresh_token: RefreshToken,
 }
 
 #[derive(Debug)]
