@@ -78,6 +78,31 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
         Ok(())
     }
 
+    #[instrument(level = "debug", err, skip(self))]
+    async fn find_all(&self) -> Result<Vec<AuthenticatedUser>> {
+        let rows = query!(
+            "SELECT user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at FROM authenticated_users",
+        ).fetch_all(&self.pool).await?;
+        let users = rows
+            .into_iter()
+            .map(|row| {
+                AuthenticatedUser::from_snapshot(AuthenticatedUserSnapshot {
+                    user_id: UserId(row.user_id as u64),
+                    name: row.name,
+                    email: row.email,
+                    oauth_token: OAuthToken {
+                        access_token: AccessToken(row.access_token),
+                        expires_at: row.access_token_expires_at.and_utc(),
+                        refresh_token: RefreshToken(row.refresh_token),
+                    },
+                    class_id: row.class_id,
+                    authenticated_at: row.authenticated_at.and_utc(),
+                })
+            })
+            .collect();
+        Ok(users)
+    }
+
     #[instrument(level = "debug", err, skip(self, user_id))]
     async fn find_by_user_id(&self, user_id: UserId) -> Result<Option<AuthenticatedUser>> {
         let row = query!(
@@ -102,6 +127,28 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
             )))
         } else {
             Ok(None)
+        }
+    }
+
+    #[instrument(level = "debug", err, skip(self))]
+    async fn count_verified_users(&self) -> Result<u32> {
+        let res = query!("SELECT COUNT(user_id) FROM authenticated_users")
+            .fetch_one(&self.pool)
+            .await?;
+        if let Some(count) = res.count {
+            Ok(count as u32)
+        } else {
+            Ok(0)
+        }
+    }
+
+    #[instrument(level = "debug", err, skip(self))]
+    async fn count_verified_users_with_user_info(&self) -> Result<u32> {
+        let res = query!("SELECT COUNT(user_id) FROM authenticated_users WHERE name IS NOT NULL AND email IS NOT NULL").fetch_one(&self.pool).await?;
+        if let Some(count) = res.count {
+            Ok(count as u32)
+        } else {
+            Ok(0)
         }
     }
 }

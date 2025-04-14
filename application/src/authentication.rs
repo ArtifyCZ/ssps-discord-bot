@@ -1,5 +1,5 @@
 use application_ports::authentication::{
-    AuthenticatedUserInfoDto, AuthenticationError, AuthenticationPort,
+    AuthenticatedUserInfoDto, AuthenticationError, AuthenticationPort, VerifiedUserStatsDto,
 };
 use application_ports::discord::InviteLink;
 use async_trait::async_trait;
@@ -120,6 +120,54 @@ impl AuthenticationPort for AuthenticationService {
             class_id,
             authenticated_at,
         }))
+    }
+
+    #[instrument(level = "info", skip(self))]
+    async fn get_verified_user_stats(
+        &self,
+        load_user_info: bool,
+    ) -> Result<VerifiedUserStatsDto, AuthenticationError> {
+        if load_user_info {
+            let users = self.authenticated_user_repository.find_all().await?;
+            for user in users {
+                if user.name().is_some() && user.email().is_some() {
+                    continue;
+                }
+
+                info!("Loading user info of user {}", user.user_id().0);
+
+                let mut user = user;
+                if user.oauth_token().expires_at < Utc::now() {
+                    user.update_oauth_token(
+                        self.oauth_port.refresh_token(user.oauth_token()).await?,
+                    );
+                }
+                let user_info = self
+                    .oauth_port
+                    .get_user_info(&user.oauth_token().access_token)
+                    .await?;
+                user.set_user_info(user_info.name, user_info.email);
+                self.authenticated_user_repository.save(&user).await?;
+                info!(
+                    user_id = user.user_id().0,
+                    "User info retrieved successfully"
+                );
+            }
+            info!("User info loaded successfully");
+        }
+
+        let total_verified_users = self
+            .authenticated_user_repository
+            .count_verified_users()
+            .await?;
+        let total_verified_users_with_user_info = self
+            .authenticated_user_repository
+            .count_verified_users_with_user_info()
+            .await?;
+        Ok(VerifiedUserStatsDto {
+            total_verified_users,
+            total_verified_users_with_user_info,
+        })
     }
 
     #[instrument(level = "info", skip(self))]

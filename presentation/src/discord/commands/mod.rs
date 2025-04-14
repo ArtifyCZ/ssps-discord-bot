@@ -4,7 +4,8 @@ use poise::Command;
 use tracing::instrument;
 
 pub mod update_information;
-mod user_info;
+pub mod user_info;
+pub mod verified_user_stats;
 pub mod verify;
 
 #[instrument(level = "trace", skip())]
@@ -12,6 +13,7 @@ pub fn enabled_commands<L: Locator + Send + Sync + 'static>() -> Vec<Command<L, 
     vec![
         update_information::command(),
         user_info::command(),
+        verified_user_stats::command(),
         verify::command(),
     ]
 }

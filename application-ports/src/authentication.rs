@@ -10,6 +10,10 @@ pub trait AuthenticationPort {
         &self,
         user_id: UserId,
     ) -> Result<Option<AuthenticatedUserInfoDto>, AuthenticationError>;
+    async fn get_verified_user_stats(
+        &self,
+        load_user_info: bool,
+    ) -> Result<VerifiedUserStatsDto, AuthenticationError>;
     async fn create_authentication_link(
         &self,
         user_id: UserId,
@@ -37,4 +41,9 @@ pub struct AuthenticatedUserInfoDto {
     pub email: String,
     pub class_id: String,
     pub authenticated_at: chrono::DateTime<chrono::Utc>,
+}
+
+pub struct VerifiedUserStatsDto {
+    pub total_verified_users: u32,
+    pub total_verified_users_with_user_info: u32,
 }
