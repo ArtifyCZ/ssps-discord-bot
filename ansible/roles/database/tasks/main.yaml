@@ -1,7 +1,7 @@
 ---
 -   name: Pull the database
     community.docker.docker_image:
-        name: "postgres:17"
+        name: "postgres:{{ database_postgres_version }}"
         source: pull
         force_source: no
         force_tag: yes
@@ -19,15 +19,14 @@
     community.docker.docker_network:
         name: "{{ docker_network_name }}"
         state: present
--   name: Start the database
+-   name: Start database container
     community.docker.docker_container:
         name: "{{ database_container_name }}"
         image: "postgres:17"
         hostname: "{{ database_container_hostname }}"
         state: started
         pull: never
-        recreate: true
-        restart_policy: always
+        restart_policy: "unless-stopped"
         env:
             POSTGRES_DB: "{{ database_name }}"
             POSTGRES_USER: "{{ database_user }}"
@@ -35,4 +34,5 @@
         networks:
             -   name: "{{ docker_network_name }}"
         volumes:
-            -   "{{ database_volume_path }}:/var/lib/postgresql/data"
+            - "{{ database_volume_path }}:/var/lib/postgresql/data"
+
