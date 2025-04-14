@@ -4,6 +4,7 @@
     <file url="file://$PROJECT_DIR$/infrastructure/migrations/20250404190830_add_user_authentication_requests_table.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/infrastructure/migrations/20250404191928_add_authenticated_users_table.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/infrastructure/migrations/20250410112825_add_expiration_col_to_authenticated_users.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/infrastructure/migrations/20250414151750_make_name_and_email_not_nullable.sql" dialect="PostgreSQL" />
     <file url="PROJECT" dialect="PostgreSQL" />
   </component>
 </project>

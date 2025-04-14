@@ -11,8 +11,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct AuthenticatedUser {
     user_id: UserId,
-    name: Option<String>,
-    email: Option<String>,
+    name: String,
+    email: String,
     oauth_token: OAuthToken,
     class_id: String,
     authenticated_at: DateTime<Utc>,
@@ -23,20 +23,21 @@ impl AuthenticatedUser {
     pub fn user_id(&self) -> UserId {
         self.user_id
     }
+
     #[instrument(level = "trace", skip(self))]
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     #[instrument(level = "trace", skip(self))]
-    pub fn email(&self) -> Option<&str> {
-        self.email.as_deref()
+    pub fn email(&self) -> &str {
+        &self.email
     }
 
     #[instrument(level = "trace", skip(self))]
     pub fn set_user_info(&mut self, name: String, email: String) {
-        self.name = Some(name);
-        self.email = Some(email);
+        self.name = name;
+        self.email = email;
     }
 
     #[instrument(level = "trace", skip(self))]
@@ -70,8 +71,8 @@ pub fn create_user_from_successful_authentication(
 ) -> AuthenticatedUser {
     AuthenticatedUser {
         user_id: request.user_id(),
-        name: Some(name),
-        email: Some(email),
+        name,
+        email,
         oauth_token,
         class_id,
         authenticated_at: Utc::now(),
@@ -106,8 +107,8 @@ impl AuthenticatedUser {
 
 pub struct AuthenticatedUserSnapshot {
     pub user_id: UserId,
-    pub name: Option<String>,
-    pub email: Option<String>,
+    pub name: String,
+    pub email: String,
     pub oauth_token: OAuthToken,
     pub class_id: String,
     pub authenticated_at: DateTime<Utc>,

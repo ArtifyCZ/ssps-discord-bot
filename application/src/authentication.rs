@@ -1,11 +1,11 @@
 use application_ports::authentication::{
-    AuthenticatedUserInfoDto, AuthenticationError, AuthenticationPort, VerifiedUserStatsDto,
+    AuthenticatedUserInfoDto, AuthenticationError, AuthenticationPort,
 };
 use application_ports::discord::InviteLink;
 use async_trait::async_trait;
 use chrono::Utc;
 use domain::authentication::authenticated_user::{
-    create_user_from_successful_authentication, AuthenticatedUserRepository,
+    create_user_from_successful_authentication, AuthenticatedUser, AuthenticatedUserRepository,
 };
 use domain::authentication::create_class_user_group_id_mails;
 use domain::authentication::user_authentication_request::{
@@ -51,6 +51,34 @@ impl AuthenticationService {
             additional_student_roles,
         }
     }
+
+    #[instrument(level = "info", skip(self, user))]
+    pub async fn refresh_user_info(
+        &self,
+        mut user: AuthenticatedUser,
+    ) -> Result<AuthenticatedUser, AuthenticationError> {
+        if user.oauth_token().expires_at < Utc::now() {
+            info!(
+                user_id = user.user_id().0,
+                "User's OAuth token is expired, refreshing it",
+            );
+            user.update_oauth_token(self.oauth_port.refresh_token(user.oauth_token()).await?);
+        }
+
+        let user_info = self
+            .oauth_port
+            .get_user_info(&user.oauth_token().access_token)
+            .await?;
+
+        user.set_user_info(user_info.name, user_info.email);
+        self.authenticated_user_repository.save(&user).await?;
+        info!(
+            user_id = user.user_id().0,
+            "User info refreshed successfully",
+        );
+
+        Ok(user)
+    }
 }
 
 #[async_trait]
@@ -59,8 +87,9 @@ impl AuthenticationPort for AuthenticationService {
     async fn get_user_info(
         &self,
         user_id: UserId,
+        force_refresh: bool,
     ) -> Result<Option<AuthenticatedUserInfoDto>, AuthenticationError> {
-        let mut user = match self
+        let user = match self
             .authenticated_user_repository
             .find_by_user_id(user_id)
             .await?
@@ -75,99 +104,21 @@ impl AuthenticationPort for AuthenticationService {
             }
         };
 
-        if let Some(name) = user.name() {
-            if let Some(email) = user.email() {
-                info!(
-                    user_id = user_id.0,
-                    "User info already exists, returning it",
-                );
-                return Ok(Some(AuthenticatedUserInfoDto {
-                    user_id,
-                    name: name.into(),
-                    email: email.into(),
-                    class_id: user.class_id().into(),
-                    authenticated_at: user.authenticated_at(),
-                }));
-            }
-        }
-
-        if user.oauth_token().expires_at < Utc::now() {
-            info!(
-                user_id = user_id.0,
-                "User's OAuth token is expired, refreshing it",
-            );
-            user.update_oauth_token(self.oauth_port.refresh_token(user.oauth_token()).await?);
-        }
-
-        let user_info = self
-            .oauth_port
-            .get_user_info(&user.oauth_token().access_token)
-            .await?;
-
-        let name = user_info.name;
-        let email = user_info.email;
-        let class_id = user.class_id().into();
-        let authenticated_at = user.authenticated_at();
-        user.set_user_info(name.clone(), email.clone());
-        self.authenticated_user_repository.save(&user).await?;
+        let user = if force_refresh {
+            self.refresh_user_info(user).await?
+        } else {
+            user
+        };
 
         info!(user_id = user_id.0, "User info retrieved successfully");
 
         Ok(Some(AuthenticatedUserInfoDto {
             user_id,
-            name,
-            email,
-            class_id,
-            authenticated_at,
+            name: user.name().to_string(),
+            email: user.email().to_string(),
+            class_id: user.class_id().to_string(),
+            authenticated_at: user.authenticated_at(),
         }))
-    }
-
-    #[instrument(level = "info", skip(self))]
-    async fn get_verified_user_stats(
-        &self,
-        load_user_info: bool,
-    ) -> Result<VerifiedUserStatsDto, AuthenticationError> {
-        if load_user_info {
-            let users = self.authenticated_user_repository.find_all().await?;
-            for user in users {
-                if user.name().is_some() && user.email().is_some() {
-                    continue;
-                }
-
-                info!("Loading user info of user {}", user.user_id().0);
-
-                let mut user = user;
-                if user.oauth_token().expires_at < Utc::now() {
-                    user.update_oauth_token(
-                        self.oauth_port.refresh_token(user.oauth_token()).await?,
-                    );
-                }
-                let user_info = self
-                    .oauth_port
-                    .get_user_info(&user.oauth_token().access_token)
-                    .await?;
-                user.set_user_info(user_info.name, user_info.email);
-                self.authenticated_user_repository.save(&user).await?;
-                info!(
-                    user_id = user.user_id().0,
-                    "User info retrieved successfully"
-                );
-            }
-            info!("User info loaded successfully");
-        }
-
-        let total_verified_users = self
-            .authenticated_user_repository
-            .count_verified_users()
-            .await?;
-        let total_verified_users_with_user_info = self
-            .authenticated_user_repository
-            .count_verified_users_with_user_info()
-            .await?;
-        Ok(VerifiedUserStatsDto {
-            total_verified_users,
-            total_verified_users_with_user_info,
-        })
     }
 
     #[instrument(level = "info", skip(self))]

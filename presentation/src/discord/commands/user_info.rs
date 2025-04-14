@@ -16,16 +16,18 @@ use tracing::{error, info, instrument, warn};
 pub async fn command<D: Sync + Locator>(
     ctx: Context<'_, D>,
     #[description = "Selected target"] target: serenity::User,
+    #[description = "Force refresh user info (default false)"] force_refresh: Option<bool>,
 ) -> Result<(), Error> {
     info!(
         guild_id = ctx.guild_id().map(|id| id.get()),
         user_id = ctx.author().id.get(),
         "Accessing user info",
     );
+    let force_refresh = force_refresh.unwrap_or(false);
 
     let authentication_port = ctx.data().get_authentication_port();
     let user_info = match authentication_port
-        .get_user_info(UserId(target.id.get()))
+        .get_user_info(UserId(target.id.get()), force_refresh)
         .await
     {
         Ok(user_info) => user_info,

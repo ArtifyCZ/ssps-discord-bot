@@ -9,11 +9,8 @@ pub trait AuthenticationPort {
     async fn get_user_info(
         &self,
         user_id: UserId,
+        force_refresh: bool,
     ) -> Result<Option<AuthenticatedUserInfoDto>, AuthenticationError>;
-    async fn get_verified_user_stats(
-        &self,
-        load_user_info: bool,
-    ) -> Result<VerifiedUserStatsDto, AuthenticationError>;
     async fn create_authentication_link(
         &self,
         user_id: UserId,
