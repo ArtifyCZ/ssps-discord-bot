@@ -1,14 +1,14 @@
 all:
     hosts:
-        tux:
-            ansible_host: 212.79.96.110
-            ansible_user: artify
-
     children:
         production:
             hosts:
                 tux:
+                    ansible_host: 212.79.96.110
+                    ansible_user: artify
 
         testing_alpha:
             hosts:
-                tux:
+                tux_testing:
+                    ansible_host: 212.79.96.110
+                    ansible_user: artify

@@ -1,6 +1,6 @@
 ---
 -   name: Deploy the bot
-    hosts: tux
+    hosts: all
     roles:
         -   role: database
         -   role: ssps-discord-bot
