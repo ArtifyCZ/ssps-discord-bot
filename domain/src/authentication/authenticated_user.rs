@@ -119,6 +119,5 @@ pub trait AuthenticatedUserRepository {
     async fn save(&self, user: &AuthenticatedUser) -> Result<()>;
     async fn find_all(&self) -> Result<Vec<AuthenticatedUser>>;
     async fn find_by_user_id(&self, user_id: UserId) -> Result<Option<AuthenticatedUser>>;
-    async fn count_verified_users(&self) -> Result<u32>;
-    async fn count_verified_users_with_user_info(&self) -> Result<u32>;
+    async fn find_by_email(&self, email: &str) -> Result<Option<AuthenticatedUser>>;
 }

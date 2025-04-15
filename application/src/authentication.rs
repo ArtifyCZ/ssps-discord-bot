@@ -188,6 +188,19 @@ impl AuthenticationPort for AuthenticationService {
             .get_user_info(&oauth_token.access_token)
             .await?;
 
+        if let Some(user) = self
+            .authenticated_user_repository
+            .find_by_email(&user_info.email)
+            .await?
+        {
+            warn!(
+                user_id = user_id.0,
+                email = user.email(),
+                "User tried to authenticate with an already used email"
+            );
+            return Err(AuthenticationError::EmailAlreadyInUse);
+        }
+
         let user = create_user_from_successful_authentication(
             &request,
             user_info.name,

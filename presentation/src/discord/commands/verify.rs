@@ -31,6 +31,7 @@ pub async fn command<D: Sync + Locator>(ctx: Context<'_, D>) -> Result<(), Error
         Ok(link) => link,
         Err(AuthenticationError::Error(error)) => return Err(error),
         Err(AuthenticationError::AuthenticationRequestNotFound) => unreachable!(),
+        Err(AuthenticationError::EmailAlreadyInUse) => unreachable!(),
         Err(AuthenticationError::AlreadyAuthenticated) => {
             let response = "You have already been verified. It is not possible to create another verification link.".to_string();
 
