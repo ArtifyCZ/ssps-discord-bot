@@ -30,6 +30,8 @@ pub enum AuthenticationError {
     AlreadyAuthenticated,
     #[error("User authentication request was not found")]
     AuthenticationRequestNotFound,
+    #[error("Email is already in use by another user")]
+    EmailAlreadyInUse,
 }
 
 pub struct AuthenticatedUserInfoDto {

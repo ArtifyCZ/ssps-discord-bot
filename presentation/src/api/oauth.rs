@@ -36,6 +36,10 @@ pub async fn callback_handler<L: Locator>(
             warn!("Authentication request not found");
             return Redirect::to("/").into_response();
         }
+        Err(AuthenticationError::EmailAlreadyInUse) => {
+            warn!("Email already in use");
+            return StatusCode::CONFLICT.into_response();
+        }
     };
 
     Redirect::to(&invite_link.0).into_response()

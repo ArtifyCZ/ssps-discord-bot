@@ -23,6 +23,23 @@ impl PostgresAuthenticatedUserRepository {
     }
 }
 
+macro_rules! record_to_user {
+    ($record:ident) => {
+        AuthenticatedUser::from_snapshot(AuthenticatedUserSnapshot {
+            user_id: UserId($record.user_id as u64),
+            name: $record.name,
+            email: $record.email,
+            oauth_token: OAuthToken {
+                access_token: AccessToken($record.access_token),
+                expires_at: $record.access_token_expires_at.and_utc(),
+                refresh_token: RefreshToken($record.refresh_token),
+            },
+            class_id: $record.class_id,
+            authenticated_at: $record.authenticated_at.and_utc(),
+        })
+    };
+}
+
 #[async_trait]
 impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
     #[instrument(level = "debug", err, skip(self, user))]
@@ -83,23 +100,7 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
         let rows = query!(
             "SELECT user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at FROM authenticated_users",
         ).fetch_all(&self.pool).await?;
-        let users = rows
-            .into_iter()
-            .map(|row| {
-                AuthenticatedUser::from_snapshot(AuthenticatedUserSnapshot {
-                    user_id: UserId(row.user_id as u64),
-                    name: row.name,
-                    email: row.email,
-                    oauth_token: OAuthToken {
-                        access_token: AccessToken(row.access_token),
-                        expires_at: row.access_token_expires_at.and_utc(),
-                        refresh_token: RefreshToken(row.refresh_token),
-                    },
-                    class_id: row.class_id,
-                    authenticated_at: row.authenticated_at.and_utc(),
-                })
-            })
-            .collect();
+        let users = rows.into_iter().map(|row| record_to_user!(row)).collect();
         Ok(users)
     }
 
@@ -111,20 +112,21 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
         ).fetch_optional(&self.pool).await?;
 
         if let Some(row) = row {
-            Ok(Some(AuthenticatedUser::from_snapshot(
-                AuthenticatedUserSnapshot {
-                    user_id: UserId(row.user_id as u64),
-                    name: row.name,
-                    email: row.email,
-                    oauth_token: OAuthToken {
-                        access_token: AccessToken(row.access_token),
-                        expires_at: row.access_token_expires_at.and_utc(),
-                        refresh_token: RefreshToken(row.refresh_token),
-                    },
-                    class_id: row.class_id,
-                    authenticated_at: row.authenticated_at.and_utc(),
-                },
-            )))
+            Ok(Some(record_to_user!(row)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[instrument(level = "debug", err, skip(self, email))]
+    async fn find_by_email(&self, email: &str) -> Result<Option<AuthenticatedUser>> {
+        let row = query!(
+            "SELECT user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at FROM authenticated_users WHERE email = $1",
+            email,
+        ).fetch_optional(&self.pool).await?;
+
+        if let Some(row) = row {
+            Ok(Some(record_to_user!(row)))
         } else {
             Ok(None)
         }

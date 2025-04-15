@@ -51,6 +51,7 @@ pub async fn handle_button_click<L: Locator>(
             return Ok(());
         }
         Err(AuthenticationError::Error(error)) => return Err(error),
+        Err(AuthenticationError::EmailAlreadyInUse) => unreachable!(),
         Err(AuthenticationError::AuthenticationRequestNotFound) => unreachable!(),
     };
 
