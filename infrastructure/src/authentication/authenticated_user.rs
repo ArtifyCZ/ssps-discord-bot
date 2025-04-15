@@ -131,26 +131,4 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
             Ok(None)
         }
     }
-
-    #[instrument(level = "debug", err, skip(self))]
-    async fn count_verified_users(&self) -> Result<u32> {
-        let res = query!("SELECT COUNT(user_id) FROM authenticated_users")
-            .fetch_one(&self.pool)
-            .await?;
-        if let Some(count) = res.count {
-            Ok(count as u32)
-        } else {
-            Ok(0)
-        }
-    }
-
-    #[instrument(level = "debug", err, skip(self))]
-    async fn count_verified_users_with_user_info(&self) -> Result<u32> {
-        let res = query!("SELECT COUNT(user_id) FROM authenticated_users WHERE name IS NOT NULL AND email IS NOT NULL").fetch_one(&self.pool).await?;
-        if let Some(count) = res.count {
-            Ok(count as u32)
-        } else {
-            Ok(0)
-        }
-    }
 }
