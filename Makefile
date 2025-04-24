@@ -19,6 +19,17 @@ deploy: ## Deploy the application on production; requires publishing to GitHub's
 	@echo "Deploying the application on production..."
 	@ansible-playbook ansible/deploy.yaml -i ansible/inventory.yaml --extra-vars "bot_image_tag=latest" -l production
 
+lint: ## Fix code-style and check linting
+	@echo "\n\n"
+	@echo "\t/-----------------------------------------------\\"
+	@echo "\t|  Running code-style fixes and lint checks...  |"
+	@echo "\t\\-----------------------------------------------/"
+	@echo "\n"
+	@cargo fmt --all
+	@clippy-tracing --action check
+	@cargo clippy --all-targets --all-features -- -D warnings
+	@echo "Successfully checked code-style and linting"
+
 cs-fix: ## Fix coding standards issues
 	@echo "Fixing coding standards issues..."
 	@cargo fmt
