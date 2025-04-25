@@ -68,9 +68,7 @@ pub async fn command<D: Sync + Locator>(
         }
     }
 
-    let fields = non_verified_users
-        .into_iter()
-        .map(|user_id| ("", format!("<@{}>", user_id.0), false));
+    let fields = vec![("celkem", non_verified_users.len().to_string(), false)];
 
     let embed = CreateEmbed::default()
         .title("Neověření studenti s rolí")
