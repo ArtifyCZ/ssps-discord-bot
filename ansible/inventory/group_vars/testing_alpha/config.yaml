@@ -1,7 +1,7 @@
 bot_container_name: "ssps-discord-bot-testing-alpha"
 bot_container_hostname: "ssps-discord-bot-testing-alpha"
 discord_bot_token: "{{ vault_discord_bot_token }}"
-invite_link: "https://discord.gg/YJzAfGF7"
+invite_link: "https://discord.gg/n5EuUNMRpb"
 discord_guild_id: "1359902382233878641"
 docker_network_name: "ssps-discord-bot"
 bot_env_file: "/etc/ssps-discord-bot-testing_alpha/.env"
