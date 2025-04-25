@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use domain_shared::authentication::{AuthenticationLink, ClientCallbackToken, CsrfToken};
-use domain_shared::discord::{InviteLink, UserId};
+use domain_shared::discord::{InviteLink, RoleId, UserId};
 use thiserror::Error;
 use tracing::error;
 
@@ -20,6 +20,11 @@ pub trait AuthenticationPort {
         csrf_token: CsrfToken,
         client_callback_token: ClientCallbackToken,
     ) -> Result<InviteLink, AuthenticationError>;
+    async fn get_main_student_role(&self) -> RoleId;
+    async fn remove_roles_from_non_authenticated_user(
+        &self,
+        user_id: UserId,
+    ) -> Result<(), AuthenticationError>;
 }
 
 #[derive(Debug, Error)]

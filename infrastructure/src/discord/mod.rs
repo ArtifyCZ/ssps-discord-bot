@@ -128,7 +128,7 @@ impl DiscordPort for DiscordAdapter {
 
         let class_ids: Vec<String> = create_class_user_group_id_mails()
             .into_iter()
-            .map(|(class_id, _)| class_id)
+            .map(|(class_id, _)| class_id.to_uppercase())
             .collect();
 
         let roles = self
