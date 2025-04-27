@@ -31,10 +31,10 @@ pub async fn command<D: Sync + Locator>(
 
     let main_student_role_id = authentication_port.get_main_student_role().await;
 
-    let users = ctx
-        .http()
-        .get_guild_members(guild_id, Some(1000), None)
-        .await?;
+    let users = ctx.http().get_guild_members(guild_id, None, None).await?;
+
+    info!(members = users.len(), "members total");
+
     let members = users
         .into_iter()
         .filter(|user| {
@@ -43,6 +43,11 @@ pub async fn command<D: Sync + Locator>(
                 .any(|role| role.get() == main_student_role_id.0)
         })
         .collect::<Vec<_>>();
+
+    info!(
+        students = members.len(),
+        "students with role, both verified and non-verified",
+    );
 
     let mut non_verified_users = Vec::with_capacity(members.len());
 
@@ -60,6 +65,10 @@ pub async fn command<D: Sync + Locator>(
         };
         if user_info.is_none() {
             non_verified_users.push(user_id);
+            info!(
+                user_id = user_id.0,
+                "User is not verified yet has student role",
+            );
             if force_removal {
                 authentication_port
                     .remove_roles_from_non_authenticated_user(user_id)
