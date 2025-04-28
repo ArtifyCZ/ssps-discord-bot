@@ -702,7 +702,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "domain-shared",
- "serde",
  "tracing",
 ]
 
