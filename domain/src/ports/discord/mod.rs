@@ -14,31 +14,32 @@ use domain_shared::discord::{RoleId, UserId};
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Result<T> = std::result::Result<T, Error>;
 
+#[cfg_attr(feature = "mock", mockall::automock)]
 #[async_trait]
 pub trait DiscordPort {
     async fn send_message(&self, channel_id: ChannelId, message: CreateMessage) -> Result<()>;
     async fn purge_messages(&self, channel_id: ChannelId) -> Result<()>;
-    async fn assign_user_to_role(
+    async fn assign_user_to_role<'a>(
         &self,
         user_id: UserId,
         role_id: RoleId,
-        reason: Option<&str>,
+        reason: Option<&'a str>,
     ) -> Result<()>;
-    async fn remove_user_from_role(
+    async fn remove_user_from_role<'a>(
         &self,
         user_id: UserId,
         role_id: RoleId,
-        reason: Option<&str>,
+        reason: Option<&'a str>,
     ) -> Result<()>;
-    async fn assign_user_to_class_role(
+    async fn assign_user_to_class_role<'a>(
         &self,
         user_id: UserId,
-        class_id: &str,
-        reason: Option<&str>,
+        class_id: &'a str,
+        reason: Option<&'a str>,
     ) -> Result<()>;
-    async fn remove_user_from_class_roles(
+    async fn remove_user_from_class_roles<'a>(
         &self,
         user_id: UserId,
-        reason: Option<&str>,
+        reason: Option<&'a str>,
     ) -> Result<()>;
 }

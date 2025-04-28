@@ -7,6 +7,7 @@ use domain_shared::authentication::{
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Result<T> = std::result::Result<T, crate::ports::discord::Error>;
 
+#[cfg_attr(feature = "mock", mockall::automock)]
 #[async_trait]
 pub trait OAuthPort {
     async fn create_authentication_link(&self) -> Result<(AuthenticationLink, CsrfToken)>;
@@ -19,7 +20,7 @@ pub trait OAuthPort {
     async fn get_user_groups(&self, access_token: &AccessToken) -> Result<Vec<UserGroup>>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct OAuthToken {
     pub access_token: AccessToken,
     pub expires_at: DateTime<Utc>,

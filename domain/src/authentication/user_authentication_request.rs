@@ -63,12 +63,14 @@ impl UserAuthenticationRequest {
     }
 }
 
+#[derive(Clone)]
 pub struct UserAuthenticationRequestSnapshot {
     pub csrf_token: CsrfToken,
     pub user_id: UserId,
     pub requested_at: DateTime<Utc>,
 }
 
+#[cfg_attr(feature = "mock", mockall::automock)]
 #[async_trait]
 pub trait UserAuthenticationRequestRepository {
     async fn save(&self, request: &UserAuthenticationRequest) -> Result<()>;

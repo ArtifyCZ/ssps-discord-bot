@@ -60,11 +60,11 @@ impl DiscordPort for DiscordAdapter {
     }
 
     #[instrument(level = "debug", err, skip(self, user_id, role_id, reason))]
-    async fn assign_user_to_role(
+    async fn assign_user_to_role<'a>(
         &self,
         user_id: UserId,
         role_id: RoleId,
-        reason: Option<&str>,
+        reason: Option<&'a str>,
     ) -> Result<()> {
         let user_id = domain_to_serenity_user_id(user_id);
         let role_id = domain_to_serenity_role_id(role_id);
@@ -77,11 +77,11 @@ impl DiscordPort for DiscordAdapter {
     }
 
     #[instrument(level = "debug", err, skip(self, user_id, role_id, reason))]
-    async fn remove_user_from_role(
+    async fn remove_user_from_role<'a>(
         &self,
         user_id: UserId,
         role_id: RoleId,
-        reason: Option<&str>,
+        reason: Option<&'a str>,
     ) -> Result<()> {
         let user_id = domain_to_serenity_user_id(user_id);
         let role_id = domain_to_serenity_role_id(role_id);
@@ -94,11 +94,11 @@ impl DiscordPort for DiscordAdapter {
     }
 
     #[instrument(level = "debug", err, skip(self, user_id, class_id, reason))]
-    async fn assign_user_to_class_role(
+    async fn assign_user_to_class_role<'a>(
         &self,
         user_id: UserId,
-        class_id: &str,
-        reason: Option<&str>,
+        class_id: &'a str,
+        reason: Option<&'a str>,
     ) -> Result<()> {
         let user_id = domain_to_serenity_user_id(user_id);
         let class_id = class_id.to_uppercase();
@@ -119,10 +119,10 @@ impl DiscordPort for DiscordAdapter {
     }
 
     #[instrument(level = "debug", err, skip(self, user_id, reason))]
-    async fn remove_user_from_class_roles(
+    async fn remove_user_from_class_roles<'a>(
         &self,
         user_id: UserId,
-        reason: Option<&str>,
+        reason: Option<&'a str>,
     ) -> Result<()> {
         let user_id = domain_to_serenity_user_id(user_id);
 
