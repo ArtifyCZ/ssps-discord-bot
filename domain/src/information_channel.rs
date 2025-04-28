@@ -21,6 +21,7 @@ pub fn create_messages() -> Vec<CreateMessage> {
         CreateMessage::default().content(resources::CONTACTS_MD),
         CreateMessage::default().content(resources::RULES_MD),
         CreateMessage::default().content(resources::ANNOUNCEMENT_GUIDELINES_MD),
+        CreateMessage::default().content(resources::DISCORD_BOT_MD),
         CreateMessage::default()
             .content(resources::VERIFICATION_MD)
             .action_rows(vec![CreateActionRow::buttons(vec![CreateButton::new(
