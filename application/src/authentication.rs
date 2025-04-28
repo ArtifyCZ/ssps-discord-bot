@@ -28,7 +28,6 @@ pub struct AuthenticationService {
         Arc<dyn UserAuthenticationRequestRepository + Send + Sync>,
     invite_link: InviteLink,
     additional_student_roles: Vec<RoleId>,
-    main_student_role: RoleId,
 }
 
 impl AuthenticationService {
@@ -42,7 +41,6 @@ impl AuthenticationService {
         >,
         invite_link: InviteLink,
         additional_student_roles: Vec<RoleId>,
-        main_student_role: RoleId,
     ) -> Self {
         Self {
             discord_port,
@@ -51,7 +49,6 @@ impl AuthenticationService {
             user_authentication_request_repository,
             invite_link,
             additional_student_roles,
-            main_student_role,
         }
     }
 
@@ -240,49 +237,6 @@ impl AuthenticationPort for AuthenticationService {
         info!(user_id = user_id.0, "User successfully authenticated");
 
         Ok(self.invite_link.clone())
-    }
-
-    #[instrument(level = "info", skip(self))]
-    async fn get_main_student_role(&self) -> RoleId {
-        self.main_student_role
-    }
-
-    #[instrument(level = "info", skip(self))]
-    async fn remove_roles_from_non_authenticated_user(
-        &self,
-        user_id: UserId,
-    ) -> Result<(), AuthenticationError> {
-        if self
-            .authenticated_user_repository
-            .find_by_user_id(user_id)
-            .await?
-            .is_some()
-        {
-            warn!(
-                user_id = user_id.0,
-                "Tried to remove roles from an authenticated user"
-            );
-            return Err(AuthenticationError::AlreadyAuthenticated);
-        }
-
-        let reason = Some("Removing roles from not authenticated user");
-
-        self.discord_port
-            .remove_user_from_class_roles(user_id, reason)
-            .await?;
-
-        for role in &self.additional_student_roles {
-            self.discord_port
-                .remove_user_from_role(user_id, *role, reason)
-                .await?;
-        }
-
-        info!(
-            user_id = user_id.0,
-            "Roles removed from a non-authenticated user"
-        );
-
-        Ok(())
     }
 }
 

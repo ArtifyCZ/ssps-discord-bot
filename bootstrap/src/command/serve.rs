@@ -43,8 +43,6 @@ pub struct ServeArgs {
     pub invite_link: String,
     #[arg(long, env = "ADDITIONAL_STUDENT_ROLES")]
     pub additional_student_roles: String,
-    #[arg(long, env = "MAIN_STUDENT_ROLE")]
-    pub main_student_role: u64,
 }
 
 #[instrument(level = "trace", skip(common_args, args))]
@@ -65,7 +63,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         tenant_id,
         invite_link,
         additional_student_roles,
-        main_student_role,
     } = args;
     let guild = GuildId::new(guild);
     let authentication_callback_url = Url::parse(&authentication_callback_url)?;
@@ -77,7 +74,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         .into_iter()
         .map(RoleId)
         .collect();
-    let main_student_role = RoleId(main_student_role);
 
     let intents = serenity::GatewayIntents::non_privileged();
 
@@ -105,7 +101,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         user_authentication_request_repository,
         invite_link,
         additional_student_roles,
-        main_student_role,
     ));
     let information_channel_adapter =
         Arc::new(InformationChannelService::new(discord_adapter.clone()));
