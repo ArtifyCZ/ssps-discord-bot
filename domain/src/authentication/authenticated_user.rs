@@ -105,6 +105,7 @@ impl AuthenticatedUser {
     }
 }
 
+#[derive(Clone)]
 pub struct AuthenticatedUserSnapshot {
     pub user_id: UserId,
     pub name: String,
@@ -114,6 +115,7 @@ pub struct AuthenticatedUserSnapshot {
     pub authenticated_at: DateTime<Utc>,
 }
 
+#[cfg_attr(feature = "mock", mockall::automock)]
 #[async_trait]
 pub trait AuthenticatedUserRepository {
     async fn save(&self, user: &AuthenticatedUser) -> Result<()>;

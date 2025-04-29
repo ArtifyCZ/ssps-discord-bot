@@ -268,3 +268,742 @@ fn find_class_group(groups: &[UserGroup]) -> Option<&UserGroup> {
             .unwrap_or(false)
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{Duration, Utc};
+    use domain::authentication::authenticated_user::{
+        AuthenticatedUserSnapshot, MockAuthenticatedUserRepository,
+    };
+    use domain::authentication::user_authentication_request::MockUserAuthenticationRequestRepository;
+    use domain::ports::discord::MockDiscordPort;
+    use domain::ports::oauth::{MockOAuthPort, OAuthToken, UserInfoDto};
+    use domain_shared::authentication::{AccessToken, RefreshToken};
+    use std::sync::Arc;
+    use tokio;
+
+    #[instrument(level = "trace", skip_all)]
+    fn setup_mocks() -> (
+        MockDiscordPort,
+        MockOAuthPort,
+        MockAuthenticatedUserRepository,
+        MockUserAuthenticationRequestRepository,
+    ) {
+        let discord_port = MockDiscordPort::new();
+        let oauth_port = MockOAuthPort::new();
+        let authenticated_user_repository = MockAuthenticatedUserRepository::new();
+        let user_authentication_request_repository = MockUserAuthenticationRequestRepository::new();
+
+        (
+            discord_port,
+            oauth_port,
+            authenticated_user_repository,
+            user_authentication_request_repository,
+        )
+    }
+
+    #[instrument(level = "trace", skip_all)]
+    fn create_service(
+        discord_port: MockDiscordPort,
+        oauth_port: MockOAuthPort,
+        authenticated_user_repository: MockAuthenticatedUserRepository,
+        user_authentication_request_repository: MockUserAuthenticationRequestRepository,
+    ) -> AuthenticationService {
+        let invite_link = InviteLink("http://discord.gg/invite".into());
+        let additional_student_roles = vec![RoleId(123), RoleId(456)];
+        AuthenticationService::new(
+            Arc::new(discord_port),
+            Arc::new(oauth_port),
+            Arc::new(authenticated_user_repository),
+            Arc::new(user_authentication_request_repository),
+            invite_link,
+            additional_student_roles,
+        )
+    }
+
+    #[tokio::test]
+    async fn get_user_info_user_not_found() {
+        let (discord_port, oauth_port, mut authenticated_user_repo, user_auth_request_repo) =
+            setup_mocks();
+        let user_id = UserId(12345);
+
+        authenticated_user_repo
+            .expect_find_by_user_id()
+            .with(mockall::predicate::eq(user_id))
+            .times(1)
+            .returning(|_| Ok(None));
+
+        let service = create_service(
+            discord_port,
+            oauth_port,
+            authenticated_user_repo,
+            user_auth_request_repo,
+        );
+
+        let result = service.get_user_info(user_id, false).await;
+
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn get_user_info_user_found_no_refresh_needed() {
+        let (discord_port, oauth_port, mut authenticated_user_repo, user_auth_request_repo) =
+            setup_mocks();
+        let user_id = UserId(12345);
+        let name = "Test User".to_string();
+        let email = "test@example.com".to_string();
+        let class_id = "1a".to_string();
+        let expires_at = Utc::now() + Duration::hours(1);
+        let oauth_token = OAuthToken {
+            access_token: AccessToken("access".to_string()),
+            refresh_token: RefreshToken("refresh".to_string()),
+            expires_at,
+        };
+        let authenticated_at = Utc::now();
+
+        let user = AuthenticatedUser::from_snapshot(AuthenticatedUserSnapshot {
+            user_id,
+            name: name.clone(),
+            email: email.clone(),
+            class_id: class_id.clone(),
+            oauth_token: oauth_token.clone(),
+            authenticated_at,
+        });
+
+        let user_snapshot = user.to_snapshot();
+        authenticated_user_repo
+            .expect_find_by_user_id()
+            .with(mockall::predicate::eq(user_id))
+            .times(1)
+            .returning(move |_| {
+                Ok(Some(AuthenticatedUser::from_snapshot(
+                    user_snapshot.clone(),
+                )))
+            });
+
+        let service = create_service(
+            discord_port,
+            oauth_port,
+            authenticated_user_repo,
+            user_auth_request_repo,
+        );
+
+        let result = service.get_user_info(user_id, false).await;
+
+        assert!(result.is_ok());
+        let user_info_dto = result.unwrap();
+        assert!(user_info_dto.is_some());
+        let info = user_info_dto.unwrap();
+        assert_eq!(info.user_id, user_id);
+        assert_eq!(info.name, name);
+        assert_eq!(info.email, email);
+        assert_eq!(info.class_id, class_id);
+        assert_eq!(info.authenticated_at, authenticated_at);
+    }
+
+    #[tokio::test]
+    async fn get_user_info_user_found_force_refresh_no_expiry() {
+        let (discord_port, mut oauth_port, mut authenticated_user_repo, user_auth_request_repo) =
+            setup_mocks();
+        let user_id = UserId(12345);
+        let old_name = "Old Name".to_string();
+        let old_email = "old@example.com".to_string();
+        let new_name = "New Name".to_string();
+        let new_email = "new@example.com".to_string();
+        let class_id = "1a".to_string();
+        let expires_at = Utc::now() + Duration::hours(1);
+        let access_token = AccessToken("access".to_string());
+        let oauth_token = OAuthToken {
+            access_token: access_token.clone(),
+            refresh_token: RefreshToken("refresh".to_string()),
+            expires_at,
+        };
+        let authenticated_at = Utc::now() - Duration::days(1);
+
+        let initial_user = AuthenticatedUser::from_snapshot(AuthenticatedUserSnapshot {
+            user_id,
+            name: old_name.clone(),
+            email: old_email.clone(),
+            class_id: class_id.clone(),
+            oauth_token: oauth_token.clone(),
+            authenticated_at,
+        });
+
+        let initial_user_snapshot = initial_user.to_snapshot();
+        authenticated_user_repo
+            .expect_find_by_user_id()
+            .with(mockall::predicate::eq(user_id))
+            .times(1)
+            .returning(move |_| {
+                Ok(Some(AuthenticatedUser::from_snapshot(
+                    initial_user_snapshot.clone(),
+                )))
+            });
+
+        let new_name_clone_for_return = new_name.clone();
+        let new_email_clone_for_return = new_email.clone();
+        oauth_port
+            .expect_get_user_info()
+            .with(mockall::predicate::eq(access_token))
+            .times(1)
+            .returning(move |_| {
+                Ok(UserInfoDto {
+                    name: new_name_clone_for_return.clone(),
+                    email: new_email_clone_for_return.clone(),
+                })
+            });
+
+        let expected_saved_token = oauth_token.clone();
+        let expected_name_for_save = new_name.clone();
+        let expected_email_for_save = new_email.clone();
+        let class_id_clone_for_withf = class_id.clone();
+        let expected_name_for_withf = expected_name_for_save.clone();
+        let expected_email_for_withf = expected_email_for_save.clone();
+        let expected_token_for_withf = expected_saved_token.clone();
+        let authenticated_at_for_withf = authenticated_at;
+        authenticated_user_repo
+            .expect_save()
+            .withf(move |saved_user: &AuthenticatedUser| {
+                saved_user.user_id() == user_id
+                    && saved_user.name() == expected_name_for_withf
+                    && saved_user.email() == expected_email_for_withf
+                    && saved_user.class_id() == class_id_clone_for_withf
+                    && saved_user.oauth_token() == &expected_token_for_withf
+                    && saved_user.authenticated_at() == authenticated_at_for_withf
+            })
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let service = create_service(
+            discord_port,
+            oauth_port,
+            authenticated_user_repo,
+            user_auth_request_repo,
+        );
+
+        let result = service.get_user_info(user_id, true).await;
+
+        assert!(result.is_ok());
+        let user_info_dto = result.unwrap();
+        assert!(user_info_dto.is_some());
+        let info = user_info_dto.unwrap();
+        assert_eq!(info.user_id, user_id);
+        assert_eq!(info.name, new_name);
+        assert_eq!(info.email, new_email);
+        assert_eq!(info.class_id, class_id);
+        assert_eq!(info.authenticated_at, authenticated_at);
+    }
+
+    #[tokio::test]
+    async fn get_user_info_user_found_expired_token_no_force_refresh() {
+        let (discord_port, oauth_port, mut authenticated_user_repo, user_auth_request_repo) =
+            setup_mocks();
+        let user_id = UserId(12345);
+        let old_name = "Old Name".to_string();
+        let old_email = "old@example.com".to_string();
+        let class_id = "1a".to_string();
+        let expired_at = Utc::now() - Duration::hours(1);
+        let old_access_token = AccessToken("old_access".to_string());
+        let old_refresh_token = "old_refresh".to_string();
+
+        let old_oauth_token = OAuthToken {
+            access_token: old_access_token.clone(),
+            refresh_token: RefreshToken(old_refresh_token.clone()),
+            expires_at: expired_at,
+        };
+
+        let authenticated_at = Utc::now() - Duration::days(1);
+
+        let initial_user = AuthenticatedUser::from_snapshot(AuthenticatedUserSnapshot {
+            user_id,
+            name: old_name.clone(),
+            email: old_email.clone(),
+            class_id: class_id.clone(),
+            oauth_token: old_oauth_token.clone(),
+            authenticated_at,
+        });
+
+        let initial_user_snapshot = initial_user.to_snapshot();
+        authenticated_user_repo
+            .expect_find_by_user_id()
+            .with(mockall::predicate::eq(user_id))
+            .times(1)
+            .returning(move |_| {
+                Ok(Some(AuthenticatedUser::from_snapshot(
+                    initial_user_snapshot.clone(),
+                )))
+            });
+
+        let service = create_service(
+            discord_port,
+            oauth_port,
+            authenticated_user_repo,
+            user_auth_request_repo,
+        );
+
+        let result = service.get_user_info(user_id, false).await;
+
+        assert!(result.is_ok());
+        let user_info_dto = result.unwrap();
+        assert!(user_info_dto.is_some());
+        let info = user_info_dto.unwrap();
+        assert_eq!(info.user_id, user_id);
+        assert_eq!(info.name, old_name);
+        assert_eq!(info.email, old_email);
+        assert_eq!(info.class_id, class_id);
+        assert_eq!(info.authenticated_at, authenticated_at);
+    }
+
+    #[tokio::test]
+    async fn create_authentication_link_already_authenticated() {
+        let (discord_port, oauth_port, mut authenticated_user_repo, user_auth_request_repo) =
+            setup_mocks();
+        let user_id = UserId(12345);
+
+        let name = "Test User".to_string();
+        let email = "test@example.com".to_string();
+        let class_id = "1a".to_string();
+        let expires_at = Utc::now() + Duration::hours(1);
+        let oauth_token = OAuthToken {
+            access_token: AccessToken("access".to_string()),
+            refresh_token: RefreshToken("refresh".to_string()),
+            expires_at,
+        };
+        let authenticated_at = Utc::now();
+        let existing_user = AuthenticatedUser::from_snapshot(AuthenticatedUserSnapshot {
+            user_id,
+            name: name.clone(),
+            email: email.clone(),
+            class_id: class_id.clone(),
+            oauth_token: oauth_token.clone(),
+            authenticated_at,
+        });
+        let existing_user_snapshot = existing_user.to_snapshot();
+
+        authenticated_user_repo
+            .expect_find_by_user_id()
+            .with(mockall::predicate::eq(user_id))
+            .times(1)
+            .returning(move |_| {
+                Ok(Some(AuthenticatedUser::from_snapshot(
+                    existing_user_snapshot.clone(),
+                )))
+            });
+
+        let service = create_service(
+            discord_port,
+            oauth_port,
+            authenticated_user_repo,
+            user_auth_request_repo,
+        );
+
+        let result = service.create_authentication_link(user_id).await;
+
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            AuthenticationError::AlreadyAuthenticated => {}
+            other => panic!("Expected AlreadyAuthenticated, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn create_authentication_link_success() {
+        let (discord_port, mut oauth_port, mut authenticated_user_repo, mut user_auth_request_repo) =
+            setup_mocks();
+        let user_id = UserId(98765);
+        let expected_link = AuthenticationLink("http://oauth.com/auth?csrf=...&...".to_string());
+        let expected_csrf_token = CsrfToken("random_csrf_token".to_string());
+
+        authenticated_user_repo
+            .expect_find_by_user_id()
+            .with(mockall::predicate::eq(user_id))
+            .times(1)
+            .returning(|_| Ok(None));
+
+        let link_clone = expected_link.0.clone();
+        let csrf_clone = expected_csrf_token.clone();
+        oauth_port
+            .expect_create_authentication_link()
+            .times(1)
+            .returning(move || Ok((AuthenticationLink(link_clone.clone()), csrf_clone.clone())));
+
+        let csrf_clone_for_save = expected_csrf_token.clone();
+        user_auth_request_repo
+            .expect_save()
+            .withf(move |req| req.user_id() == user_id && req.csrf_token() == &csrf_clone_for_save)
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let service = create_service(
+            discord_port,
+            oauth_port,
+            authenticated_user_repo,
+            user_auth_request_repo,
+        );
+
+        let result = service.create_authentication_link(user_id).await;
+
+        assert!(result.is_ok());
+        let returned_link = result.unwrap();
+        assert_eq!(returned_link.0, expected_link.0);
+    }
+
+    #[tokio::test]
+    async fn confirm_authentication_request_not_found() {
+        let (
+            discord_port,
+            oauth_port,
+            authenticated_user_repo,
+            mut user_auth_request_repo, // mut because expect_find_by_csrf_token is called
+        ) = setup_mocks();
+
+        let csrf_token = CsrfToken("non_existent_token".to_string());
+        let client_callback_token = ClientCallbackToken("callback_code".to_string());
+
+        user_auth_request_repo
+            .expect_find_by_csrf_token()
+            .with(mockall::predicate::eq(csrf_token.clone()))
+            .times(1)
+            .returning(|_| Ok(None)); // Request not found
+
+        let service = create_service(
+            discord_port,
+            oauth_port,
+            authenticated_user_repo,
+            user_auth_request_repo,
+        );
+
+        let result = service
+            .confirm_authentication(csrf_token, client_callback_token)
+            .await;
+
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            AuthenticationError::AuthenticationRequestNotFound => {}
+            other => panic!("Expected AuthenticationRequestNotFound, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn confirm_authentication_email_already_in_use() {
+        let (discord_port, mut oauth_port, mut authenticated_user_repo, mut user_auth_request_repo) =
+            setup_mocks();
+
+        let user_id = UserId(12345); // ID from the original request
+        let csrf_token = CsrfToken("valid_csrf_token".to_string());
+        let client_callback_token = ClientCallbackToken("callback_code".to_string());
+        let oauth_access_token = AccessToken("oauth_access".to_string());
+        let oauth_refresh_token = RefreshToken("oauth_refresh".to_string());
+        let oauth_expires_at = Utc::now() + Duration::hours(1);
+        let oauth_token = OAuthToken {
+            access_token: oauth_access_token.clone(),
+            refresh_token: oauth_refresh_token.clone(),
+            expires_at: oauth_expires_at,
+        };
+        let class_group_id = "1a".to_string();
+        let class_group_mail = format!("{}@ssps.cz", class_group_id);
+        let user_groups = vec![UserGroup {
+            id: "group_id".to_string(),
+            name: class_group_id.clone(),
+            mail: Some(class_group_mail.clone()),
+        }];
+        let user_name = "Test User".to_string();
+        let user_email = "existing@example.com".to_string();
+        let existing_user_id = UserId(99999); // Different user ID
+
+        // Mock finding the original request
+        use domain::authentication::user_authentication_request::UserAuthenticationRequest;
+        use domain::authentication::user_authentication_request::UserAuthenticationRequestSnapshot;
+        let request_time = Utc::now() - Duration::minutes(5);
+        let request = UserAuthenticationRequest::from_snapshot(UserAuthenticationRequestSnapshot {
+            csrf_token: csrf_token.clone(),
+            user_id, // User ID from request
+            requested_at: request_time,
+        });
+        let request_snapshot = request.to_snapshot();
+        user_auth_request_repo
+            .expect_find_by_csrf_token()
+            .with(mockall::predicate::eq(csrf_token.clone()))
+            .times(1)
+            .returning(move |_| {
+                Ok(Some(UserAuthenticationRequest::from_snapshot(
+                    request_snapshot.clone(),
+                )))
+            });
+
+        // Mock OAuth flow
+        let oauth_token_clone = oauth_token.clone();
+        oauth_port
+            .expect_exchange_code_after_callback()
+            .with(mockall::predicate::eq(client_callback_token.clone())) // Need to clone ClientCallbackToken too
+            .times(1)
+            .returning(move |_| Ok(oauth_token_clone.clone()));
+
+        let user_groups_clone = user_groups.clone();
+        oauth_port
+            .expect_get_user_groups()
+            .with(mockall::predicate::eq(oauth_access_token.clone()))
+            .times(1)
+            .returning(move |_| Ok(user_groups_clone.clone()));
+
+        let user_name_clone = user_name.clone();
+        let user_email_clone = user_email.clone();
+        oauth_port
+            .expect_get_user_info()
+            .with(mockall::predicate::eq(oauth_access_token.clone()))
+            .times(1)
+            .returning(move |_| {
+                Ok(UserInfoDto {
+                    name: user_name_clone.clone(),
+                    email: user_email_clone.clone(),
+                })
+            });
+
+        // Mock finding an existing user with the same email
+        let existing_user_oauth_token = OAuthToken {
+            access_token: AccessToken("existing_access".to_string()),
+            refresh_token: RefreshToken("existing_refresh".to_string()),
+            expires_at: Utc::now() + Duration::hours(1),
+        };
+        let existing_user = AuthenticatedUser::from_snapshot(AuthenticatedUserSnapshot {
+            user_id: existing_user_id,
+            name: "Existing User".to_string(),
+            email: user_email.clone(), // Same email
+            class_id: "2b".to_string(),
+            oauth_token: existing_user_oauth_token,
+            authenticated_at: Utc::now() - Duration::days(2),
+        });
+        let existing_user_snapshot_for_find = existing_user.to_snapshot();
+        authenticated_user_repo
+            .expect_find_by_email()
+            .with(mockall::predicate::eq(user_email.clone()))
+            .times(1)
+            .returning(move |_| {
+                Ok(Some(AuthenticatedUser::from_snapshot(
+                    existing_user_snapshot_for_find.clone(),
+                )))
+            });
+
+        // No save or remove should happen
+
+        let service = create_service(
+            discord_port,
+            oauth_port,
+            authenticated_user_repo,
+            user_auth_request_repo,
+        );
+
+        let result = service
+            .confirm_authentication(csrf_token, client_callback_token)
+            .await;
+
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            AuthenticationError::EmailAlreadyInUse => {}
+            other => panic!("Expected EmailAlreadyInUse, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn confirm_authentication_success() {
+        let (
+            mut discord_port, // mut for role changes
+            mut oauth_port,
+            mut authenticated_user_repo,
+            mut user_auth_request_repo,
+        ) = setup_mocks();
+
+        let user_id = UserId(55555); // ID from the original request
+        let csrf_token = CsrfToken("success_csrf_token".to_string());
+        let client_callback_token = ClientCallbackToken("success_callback_code".to_string());
+        let oauth_access_token = AccessToken("success_oauth_access".to_string());
+        let oauth_refresh_token = RefreshToken("success_oauth_refresh".to_string());
+        let oauth_expires_at = Utc::now() + Duration::hours(1);
+        let oauth_token = OAuthToken {
+            access_token: oauth_access_token.clone(),
+            refresh_token: oauth_refresh_token.clone(),
+            expires_at: oauth_expires_at,
+        };
+        let class_group_id = "2a".to_string();
+        let class_group_mail = format!("{}@ssps.cz", class_group_id);
+        let user_groups = vec![UserGroup {
+            id: "group_id_2a".to_string(),
+            name: class_group_id.clone(),
+            mail: Some(class_group_mail.clone()),
+        }];
+        let user_name = "Successful User".to_string();
+        let user_email = "success@example.com".to_string();
+        let expected_invite_link = InviteLink("http://discord.gg/invite".into());
+        let additional_role1 = RoleId(123);
+        let additional_role2 = RoleId(456);
+
+        let mut seq = mockall::Sequence::new(); // Enforce sequence
+
+        // 1. Find request
+        use domain::authentication::user_authentication_request::UserAuthenticationRequest;
+        use domain::authentication::user_authentication_request::UserAuthenticationRequestSnapshot;
+        let request_time = Utc::now() - Duration::minutes(2);
+        let request = UserAuthenticationRequest::from_snapshot(UserAuthenticationRequestSnapshot {
+            csrf_token: csrf_token.clone(),
+            user_id,
+            requested_at: request_time,
+        });
+        let request_snapshot = request.to_snapshot();
+        user_auth_request_repo
+            .expect_find_by_csrf_token()
+            .with(mockall::predicate::eq(csrf_token.clone()))
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(move |_| {
+                Ok(Some(UserAuthenticationRequest::from_snapshot(
+                    request_snapshot.clone(),
+                )))
+            });
+
+        // 2. Exchange code
+        let oauth_token_clone = oauth_token.clone();
+        oauth_port
+            .expect_exchange_code_after_callback()
+            .with(mockall::predicate::eq(client_callback_token.clone()))
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(move |_| Ok(oauth_token_clone.clone()));
+
+        // 3. Get groups
+        let user_groups_clone = user_groups.clone();
+        oauth_port
+            .expect_get_user_groups()
+            .with(mockall::predicate::eq(oauth_access_token.clone()))
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(move |_| Ok(user_groups_clone.clone()));
+
+        // 4. Get user info
+        let user_name_clone = user_name.clone();
+        let user_email_clone = user_email.clone();
+        oauth_port
+            .expect_get_user_info()
+            .with(mockall::predicate::eq(oauth_access_token.clone()))
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(move |_| {
+                Ok(UserInfoDto {
+                    name: user_name_clone.clone(),
+                    email: user_email_clone.clone(),
+                })
+            });
+
+        // 5. Check email not in use
+        authenticated_user_repo
+            .expect_find_by_email()
+            .with(mockall::predicate::eq(user_email.clone()))
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_| Ok(None)); // Email not found
+
+        // 6. Save authenticated user
+        let saved_user_token_clone = oauth_token.clone();
+        let saved_user_name_clone = user_name.clone();
+        let saved_user_email_clone = user_email.clone();
+        let saved_user_class_id_clone = class_group_id.clone();
+        authenticated_user_repo
+            .expect_save()
+            .withf(move |user: &AuthenticatedUser| {
+                user.user_id() == user_id
+                    && user.name() == saved_user_name_clone
+                    && user.email() == saved_user_email_clone
+                    && user.oauth_token() == &saved_user_token_clone
+                    && user.class_id() == saved_user_class_id_clone
+                // authenticated_at is Utc::now(), difficult to assert precisely
+            })
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_| Ok(()));
+
+        // 7. Remove request
+        let csrf_clone_for_remove = csrf_token.clone();
+        user_auth_request_repo
+            .expect_remove_by_csrf_token()
+            .with(mockall::predicate::eq(csrf_clone_for_remove))
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_| Ok(()));
+
+        // 8. Discord remove roles
+        discord_port
+            .expect_remove_user_from_class_roles()
+            .with(
+                mockall::predicate::eq(user_id),
+                mockall::predicate::always(),
+            )
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _| Ok(()));
+        discord_port
+            .expect_remove_user_from_role()
+            .with(
+                mockall::predicate::eq(user_id),
+                mockall::predicate::eq(additional_role1),
+                mockall::predicate::always(),
+            )
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _, _| Ok(()));
+        discord_port
+            .expect_remove_user_from_role()
+            .with(
+                mockall::predicate::eq(user_id),
+                mockall::predicate::eq(additional_role2),
+                mockall::predicate::always(),
+            )
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _, _| Ok(()));
+
+        // 9. Discord assign roles
+        let assigned_class_id_clone = class_group_id.clone();
+        discord_port
+            .expect_assign_user_to_class_role()
+            .withf(move |uid, cid, _| *uid == user_id && cid == assigned_class_id_clone)
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _, _| Ok(()));
+        discord_port
+            .expect_assign_user_to_role()
+            .with(
+                mockall::predicate::eq(user_id),
+                mockall::predicate::eq(additional_role1),
+                mockall::predicate::always(),
+            )
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _, _| Ok(()));
+        discord_port
+            .expect_assign_user_to_role()
+            .with(
+                mockall::predicate::eq(user_id),
+                mockall::predicate::eq(additional_role2),
+                mockall::predicate::always(),
+            )
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _, _| Ok(()));
+
+        let service = create_service(
+            discord_port,
+            oauth_port,
+            authenticated_user_repo,
+            user_auth_request_repo,
+        );
+
+        let result = service
+            .confirm_authentication(csrf_token, client_callback_token)
+            .await;
+
+        assert!(result.is_ok());
+        let returned_link = result.unwrap();
+        assert_eq!(returned_link.0, expected_invite_link.0);
+    }
+}
