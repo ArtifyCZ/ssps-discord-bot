@@ -54,7 +54,7 @@ jobs:
                 uses: baptiste0928/cargo-install@v3
                 with:
                     crate: sqlx-cli
-                    version: "^0.7.0"
+                    version: "^0.8.5"
             -   name: Install Clippy Tracing
                 uses: baptiste0928/cargo-install@v3
                 with:
