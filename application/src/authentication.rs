@@ -1,9 +1,8 @@
 use application_ports::authentication::{AuthenticationError, AuthenticationPort};
 use application_ports::discord::InviteLink;
 use async_trait::async_trait;
-use chrono::Utc;
 use domain::authentication::authenticated_user::{
-    create_user_from_successful_authentication, AuthenticatedUser, AuthenticatedUserRepository,
+    create_user_from_successful_authentication, AuthenticatedUserRepository,
 };
 use domain::authentication::user_authentication_request::{
     create_user_authentication_request, UserAuthenticationRequestRepository,
@@ -47,34 +46,6 @@ impl AuthenticationService {
             invite_link,
             additional_student_roles,
         }
-    }
-
-    #[instrument(level = "info", skip(self, user))]
-    pub async fn refresh_user_info(
-        &self,
-        mut user: AuthenticatedUser,
-    ) -> Result<AuthenticatedUser, AuthenticationError> {
-        if user.oauth_token().expires_at < Utc::now() {
-            info!(
-                user_id = user.user_id().0,
-                "User's OAuth token is expired, refreshing it",
-            );
-            user.update_oauth_token(self.oauth_port.refresh_token(user.oauth_token()).await?);
-        }
-
-        let user_info = self
-            .oauth_port
-            .get_user_info(&user.oauth_token().access_token)
-            .await?;
-
-        user.set_user_info(user_info.name, user_info.email, user.class_id().into());
-        self.authenticated_user_repository.save(&user).await?;
-        info!(
-            user_id = user.user_id().0,
-            "User info refreshed successfully",
-        );
-
-        Ok(user)
     }
 }
 
@@ -204,7 +175,7 @@ mod tests {
     use super::*;
     use chrono::{Duration, Utc};
     use domain::authentication::authenticated_user::{
-        AuthenticatedUserSnapshot, MockAuthenticatedUserRepository,
+        AuthenticatedUser, AuthenticatedUserSnapshot, MockAuthenticatedUserRepository,
     };
     use domain::authentication::user_authentication_request::MockUserAuthenticationRequestRepository;
     use domain::ports::discord::MockDiscordPort;
