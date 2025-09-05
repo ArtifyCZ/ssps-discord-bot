@@ -6,11 +6,6 @@ use tracing::error;
 
 #[async_trait]
 pub trait AuthenticationPort {
-    async fn get_user_info(
-        &self,
-        user_id: UserId,
-        force_refresh: bool,
-    ) -> Result<Option<AuthenticatedUserInfoDto>, AuthenticationError>;
     async fn create_authentication_link(
         &self,
         user_id: UserId,
@@ -32,17 +27,4 @@ pub enum AuthenticationError {
     AuthenticationRequestNotFound,
     #[error("Email is already in use by another user")]
     EmailAlreadyInUse,
-}
-
-pub struct AuthenticatedUserInfoDto {
-    pub user_id: UserId,
-    pub name: String,
-    pub email: String,
-    pub class_id: String,
-    pub authenticated_at: chrono::DateTime<chrono::Utc>,
-}
-
-pub struct VerifiedUserStatsDto {
-    pub total_verified_users: u32,
-    pub total_verified_users_with_user_info: u32,
 }

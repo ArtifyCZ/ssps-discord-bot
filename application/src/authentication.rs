@@ -1,21 +1,18 @@
-use application_ports::authentication::{
-    AuthenticatedUserInfoDto, AuthenticationError, AuthenticationPort,
-};
+use application_ports::authentication::{AuthenticationError, AuthenticationPort};
 use application_ports::discord::InviteLink;
 use async_trait::async_trait;
 use chrono::Utc;
 use domain::authentication::authenticated_user::{
     create_user_from_successful_authentication, AuthenticatedUser, AuthenticatedUserRepository,
 };
-use domain::authentication::create_class_user_group_id_mails;
 use domain::authentication::user_authentication_request::{
     create_user_authentication_request, UserAuthenticationRequestRepository,
 };
+use domain::class::class_group::find_class_group;
+use domain::class::class_id::get_class_id;
 use domain::ports::discord::DiscordPort;
 use domain::ports::oauth::OAuthPort;
-use domain_shared::authentication::{
-    AuthenticationLink, ClientCallbackToken, CsrfToken, UserGroup,
-};
+use domain_shared::authentication::{AuthenticationLink, ClientCallbackToken, CsrfToken};
 use domain_shared::discord::{RoleId, UserId};
 use std::sync::Arc;
 use tracing::{info, instrument, warn, Span};
@@ -70,7 +67,7 @@ impl AuthenticationService {
             .get_user_info(&user.oauth_token().access_token)
             .await?;
 
-        user.set_user_info(user_info.name, user_info.email);
+        user.set_user_info(user_info.name, user_info.email, user.class_id().into());
         self.authenticated_user_repository.save(&user).await?;
         info!(
             user_id = user.user_id().0,
@@ -83,44 +80,6 @@ impl AuthenticationService {
 
 #[async_trait]
 impl AuthenticationPort for AuthenticationService {
-    #[instrument(level = "info", skip(self))]
-    async fn get_user_info(
-        &self,
-        user_id: UserId,
-        force_refresh: bool,
-    ) -> Result<Option<AuthenticatedUserInfoDto>, AuthenticationError> {
-        let user = match self
-            .authenticated_user_repository
-            .find_by_user_id(user_id)
-            .await?
-        {
-            Some(user) => user,
-            None => {
-                info!(
-                    user_id = user_id.0,
-                    "Tried to get user info of an unauthenticated user"
-                );
-                return Ok(None);
-            }
-        };
-
-        let user = if force_refresh {
-            self.refresh_user_info(user).await?
-        } else {
-            user
-        };
-
-        info!(user_id = user_id.0, "User info retrieved successfully");
-
-        Ok(Some(AuthenticatedUserInfoDto {
-            user_id,
-            name: user.name().to_string(),
-            email: user.email().to_string(),
-            class_id: user.class_id().to_string(),
-            authenticated_at: user.authenticated_at(),
-        }))
-    }
-
     #[instrument(level = "info", skip(self))]
     async fn create_authentication_link(
         &self,
@@ -240,35 +199,6 @@ impl AuthenticationPort for AuthenticationService {
     }
 }
 
-#[instrument(level = "trace")]
-fn get_class_id(group: &UserGroup) -> Option<String> {
-    if let Some(mail) = &group.mail {
-        let class_group_id_mails = create_class_user_group_id_mails();
-        class_group_id_mails
-            .into_iter()
-            .find(|(_, m)| m.eq(mail))
-            .map(|(id, _)| id)
-    } else {
-        None
-    }
-}
-
-#[instrument(level = "trace")]
-fn find_class_group(groups: &[UserGroup]) -> Option<&UserGroup> {
-    let class_group_id_mails = create_class_user_group_id_mails();
-    let class_group_mails = class_group_id_mails
-        .iter()
-        .map(|(_, mail)| mail)
-        .collect::<Vec<_>>();
-    groups.iter().find(|group| {
-        group
-            .mail
-            .as_ref()
-            .map(|mail| class_group_mails.contains(&mail))
-            .unwrap_or(false)
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279,7 +209,7 @@ mod tests {
     use domain::authentication::user_authentication_request::MockUserAuthenticationRequestRepository;
     use domain::ports::discord::MockDiscordPort;
     use domain::ports::oauth::{MockOAuthPort, OAuthToken, UserInfoDto};
-    use domain_shared::authentication::{AccessToken, RefreshToken};
+    use domain_shared::authentication::{AccessToken, RefreshToken, UserGroup};
     use std::sync::Arc;
     use tokio;
 
@@ -320,240 +250,6 @@ mod tests {
             invite_link,
             additional_student_roles,
         )
-    }
-
-    #[tokio::test]
-    async fn get_user_info_user_not_found() {
-        let (discord_port, oauth_port, mut authenticated_user_repo, user_auth_request_repo) =
-            setup_mocks();
-        let user_id = UserId(12345);
-
-        authenticated_user_repo
-            .expect_find_by_user_id()
-            .with(mockall::predicate::eq(user_id))
-            .times(1)
-            .returning(|_| Ok(None));
-
-        let service = create_service(
-            discord_port,
-            oauth_port,
-            authenticated_user_repo,
-            user_auth_request_repo,
-        );
-
-        let result = service.get_user_info(user_id, false).await;
-
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_none());
-    }
-
-    #[tokio::test]
-    async fn get_user_info_user_found_no_refresh_needed() {
-        let (discord_port, oauth_port, mut authenticated_user_repo, user_auth_request_repo) =
-            setup_mocks();
-        let user_id = UserId(12345);
-        let name = "Test User".to_string();
-        let email = "test@example.com".to_string();
-        let class_id = "1a".to_string();
-        let expires_at = Utc::now() + Duration::hours(1);
-        let oauth_token = OAuthToken {
-            access_token: AccessToken("access".to_string()),
-            refresh_token: RefreshToken("refresh".to_string()),
-            expires_at,
-        };
-        let authenticated_at = Utc::now();
-
-        let user = AuthenticatedUser::from_snapshot(AuthenticatedUserSnapshot {
-            user_id,
-            name: name.clone(),
-            email: email.clone(),
-            class_id: class_id.clone(),
-            oauth_token: oauth_token.clone(),
-            authenticated_at,
-        });
-
-        let user_snapshot = user.to_snapshot();
-        authenticated_user_repo
-            .expect_find_by_user_id()
-            .with(mockall::predicate::eq(user_id))
-            .times(1)
-            .returning(move |_| {
-                Ok(Some(AuthenticatedUser::from_snapshot(
-                    user_snapshot.clone(),
-                )))
-            });
-
-        let service = create_service(
-            discord_port,
-            oauth_port,
-            authenticated_user_repo,
-            user_auth_request_repo,
-        );
-
-        let result = service.get_user_info(user_id, false).await;
-
-        assert!(result.is_ok());
-        let user_info_dto = result.unwrap();
-        assert!(user_info_dto.is_some());
-        let info = user_info_dto.unwrap();
-        assert_eq!(info.user_id, user_id);
-        assert_eq!(info.name, name);
-        assert_eq!(info.email, email);
-        assert_eq!(info.class_id, class_id);
-        assert_eq!(info.authenticated_at, authenticated_at);
-    }
-
-    #[tokio::test]
-    async fn get_user_info_user_found_force_refresh_no_expiry() {
-        let (discord_port, mut oauth_port, mut authenticated_user_repo, user_auth_request_repo) =
-            setup_mocks();
-        let user_id = UserId(12345);
-        let old_name = "Old Name".to_string();
-        let old_email = "old@example.com".to_string();
-        let new_name = "New Name".to_string();
-        let new_email = "new@example.com".to_string();
-        let class_id = "1a".to_string();
-        let expires_at = Utc::now() + Duration::hours(1);
-        let access_token = AccessToken("access".to_string());
-        let oauth_token = OAuthToken {
-            access_token: access_token.clone(),
-            refresh_token: RefreshToken("refresh".to_string()),
-            expires_at,
-        };
-        let authenticated_at = Utc::now() - Duration::days(1);
-
-        let initial_user = AuthenticatedUser::from_snapshot(AuthenticatedUserSnapshot {
-            user_id,
-            name: old_name.clone(),
-            email: old_email.clone(),
-            class_id: class_id.clone(),
-            oauth_token: oauth_token.clone(),
-            authenticated_at,
-        });
-
-        let initial_user_snapshot = initial_user.to_snapshot();
-        authenticated_user_repo
-            .expect_find_by_user_id()
-            .with(mockall::predicate::eq(user_id))
-            .times(1)
-            .returning(move |_| {
-                Ok(Some(AuthenticatedUser::from_snapshot(
-                    initial_user_snapshot.clone(),
-                )))
-            });
-
-        let new_name_clone_for_return = new_name.clone();
-        let new_email_clone_for_return = new_email.clone();
-        oauth_port
-            .expect_get_user_info()
-            .with(mockall::predicate::eq(access_token))
-            .times(1)
-            .returning(move |_| {
-                Ok(UserInfoDto {
-                    name: new_name_clone_for_return.clone(),
-                    email: new_email_clone_for_return.clone(),
-                })
-            });
-
-        let expected_saved_token = oauth_token.clone();
-        let expected_name_for_save = new_name.clone();
-        let expected_email_for_save = new_email.clone();
-        let class_id_clone_for_withf = class_id.clone();
-        let expected_name_for_withf = expected_name_for_save.clone();
-        let expected_email_for_withf = expected_email_for_save.clone();
-        let expected_token_for_withf = expected_saved_token.clone();
-        let authenticated_at_for_withf = authenticated_at;
-        authenticated_user_repo
-            .expect_save()
-            .withf(move |saved_user: &AuthenticatedUser| {
-                saved_user.user_id() == user_id
-                    && saved_user.name() == expected_name_for_withf
-                    && saved_user.email() == expected_email_for_withf
-                    && saved_user.class_id() == class_id_clone_for_withf
-                    && saved_user.oauth_token() == &expected_token_for_withf
-                    && saved_user.authenticated_at() == authenticated_at_for_withf
-            })
-            .times(1)
-            .returning(|_| Ok(()));
-
-        let service = create_service(
-            discord_port,
-            oauth_port,
-            authenticated_user_repo,
-            user_auth_request_repo,
-        );
-
-        let result = service.get_user_info(user_id, true).await;
-
-        assert!(result.is_ok());
-        let user_info_dto = result.unwrap();
-        assert!(user_info_dto.is_some());
-        let info = user_info_dto.unwrap();
-        assert_eq!(info.user_id, user_id);
-        assert_eq!(info.name, new_name);
-        assert_eq!(info.email, new_email);
-        assert_eq!(info.class_id, class_id);
-        assert_eq!(info.authenticated_at, authenticated_at);
-    }
-
-    #[tokio::test]
-    async fn get_user_info_user_found_expired_token_no_force_refresh() {
-        let (discord_port, oauth_port, mut authenticated_user_repo, user_auth_request_repo) =
-            setup_mocks();
-        let user_id = UserId(12345);
-        let old_name = "Old Name".to_string();
-        let old_email = "old@example.com".to_string();
-        let class_id = "1a".to_string();
-        let expired_at = Utc::now() - Duration::hours(1);
-        let old_access_token = AccessToken("old_access".to_string());
-        let old_refresh_token = "old_refresh".to_string();
-
-        let old_oauth_token = OAuthToken {
-            access_token: old_access_token.clone(),
-            refresh_token: RefreshToken(old_refresh_token.clone()),
-            expires_at: expired_at,
-        };
-
-        let authenticated_at = Utc::now() - Duration::days(1);
-
-        let initial_user = AuthenticatedUser::from_snapshot(AuthenticatedUserSnapshot {
-            user_id,
-            name: old_name.clone(),
-            email: old_email.clone(),
-            class_id: class_id.clone(),
-            oauth_token: old_oauth_token.clone(),
-            authenticated_at,
-        });
-
-        let initial_user_snapshot = initial_user.to_snapshot();
-        authenticated_user_repo
-            .expect_find_by_user_id()
-            .with(mockall::predicate::eq(user_id))
-            .times(1)
-            .returning(move |_| {
-                Ok(Some(AuthenticatedUser::from_snapshot(
-                    initial_user_snapshot.clone(),
-                )))
-            });
-
-        let service = create_service(
-            discord_port,
-            oauth_port,
-            authenticated_user_repo,
-            user_auth_request_repo,
-        );
-
-        let result = service.get_user_info(user_id, false).await;
-
-        assert!(result.is_ok());
-        let user_info_dto = result.unwrap();
-        assert!(user_info_dto.is_some());
-        let info = user_info_dto.unwrap();
-        assert_eq!(info.user_id, user_id);
-        assert_eq!(info.name, old_name);
-        assert_eq!(info.email, old_email);
-        assert_eq!(info.class_id, class_id);
-        assert_eq!(info.authenticated_at, authenticated_at);
     }
 
     #[tokio::test]

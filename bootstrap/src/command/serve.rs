@@ -13,6 +13,7 @@ use url::Url;
 use crate::args::CommonArgs;
 use application::authentication::AuthenticationService;
 use application::information_channel::InformationChannelService;
+use application::user::UserService;
 use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUserRepository;
 use infrastructure::authentication::user_authentication_request::PostgresUserAuthenticationRequestRepository;
 use infrastructure::discord::DiscordAdapter;
@@ -70,10 +71,11 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
     let oauth_client_secret = ClientSecret::new(oauth_client_secret);
     let tenant_id = TenantId(tenant_id);
     let invite_link = InviteLink(invite_link);
-    let additional_student_roles = serde_json::from_str::<Vec<u64>>(&additional_student_roles)?
-        .into_iter()
-        .map(RoleId)
-        .collect();
+    let additional_student_roles: Vec<RoleId> =
+        serde_json::from_str::<Vec<u64>>(&additional_student_roles)?
+            .into_iter()
+            .map(RoleId)
+            .collect();
 
     let intents = serenity::GatewayIntents::non_privileged();
 
@@ -96,17 +98,25 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
 
     let authentication_adapter = Arc::new(AuthenticationService::new(
         discord_adapter.clone(),
-        oauth_adapter,
-        authenticated_user_repository,
+        oauth_adapter.clone(),
+        authenticated_user_repository.clone(),
         user_authentication_request_repository,
         invite_link,
-        additional_student_roles,
+        additional_student_roles.clone(),
     ));
     let information_channel_adapter =
         Arc::new(InformationChannelService::new(discord_adapter.clone()));
+    let user_adapter = Arc::new(UserService::new(
+        discord_adapter,
+        oauth_adapter,
+        authenticated_user_repository,
+    ));
 
-    let locator =
-        locator::ApplicationPortLocator::new(authentication_adapter, information_channel_adapter);
+    let locator = locator::ApplicationPortLocator::new(
+        authentication_adapter,
+        information_channel_adapter,
+        user_adapter,
+    );
 
     let api = tokio::spawn(run_api(locator.clone(), 8080));
     let bot = tokio::spawn(run_bot(locator, discord_bot_token, intents, guild));

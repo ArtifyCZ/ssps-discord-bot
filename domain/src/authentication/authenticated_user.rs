@@ -35,9 +35,15 @@ impl AuthenticatedUser {
     }
 
     #[instrument(level = "trace", skip(self))]
-    pub fn set_user_info(&mut self, name: String, email: String) {
+    pub fn set_user_info(&mut self, name: String, email: String, class_id: String) {
         self.name = name;
         self.email = email;
+        self.class_id = class_id;
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn set_class_id(&mut self, class_id: String) {
+        self.class_id = class_id;
     }
 
     #[instrument(level = "trace", skip(self))]
