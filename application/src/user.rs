@@ -33,6 +33,7 @@ impl UserService {
 
 #[async_trait]
 impl UserPort for UserService {
+    #[instrument(level = "info", skip(self))]
     async fn get_user_info(
         &self,
         user_id: UserId,
