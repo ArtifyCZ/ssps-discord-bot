@@ -32,17 +32,17 @@ impl ApplicationPortLocator {
 
 impl Locator for ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
-    fn get_authentication_port(&self) -> Arc<dyn AuthenticationPort + Send + Sync> {
-        self.authentication_adapter.clone()
+    fn get_authentication_port(&self) -> &(dyn AuthenticationPort + Send + Sync) {
+        &*self.authentication_adapter
     }
 
     #[instrument(level = "trace", skip(self))]
-    fn get_information_channel_port(&self) -> Arc<dyn InformationChannelPort + Send + Sync> {
-        self.information_channel_adapter.clone()
+    fn get_information_channel_port(&self) -> &(dyn InformationChannelPort + Send + Sync) {
+        &*self.information_channel_adapter
     }
 
     #[instrument(level = "trace", skip(self))]
-    fn get_user_port(&self) -> Arc<dyn UserPort + Send + Sync> {
-        self.user_adapter.clone()
+    fn get_user_port(&self) -> &(dyn UserPort + Send + Sync) {
+        &*self.user_adapter
     }
 }
