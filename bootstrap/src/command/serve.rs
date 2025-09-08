@@ -14,6 +14,7 @@ use crate::args::CommonArgs;
 use application::authentication::AuthenticationService;
 use application::information_channel::InformationChannelService;
 use application::user::UserService;
+use infrastructure::authentication::archived_authenticated_user::PostgresArchivedAuthenticatedUserRepository;
 use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUserRepository;
 use infrastructure::authentication::user_authentication_request::PostgresUserAuthenticationRequestRepository;
 use infrastructure::discord::DiscordAdapter;
@@ -89,6 +90,9 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         oauth_client_secret,
         tenant_id,
     ));
+    let archived_authenticated_user_repository = Arc::new(
+        PostgresArchivedAuthenticatedUserRepository::new(database_connection.clone()),
+    );
     let authenticated_user_repository = Arc::new(PostgresAuthenticatedUserRepository::new(
         database_connection.clone(),
     ));
@@ -99,6 +103,7 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
     let authentication_adapter = Arc::new(AuthenticationService::new(
         discord_adapter.clone(),
         oauth_adapter.clone(),
+        archived_authenticated_user_repository.clone(),
         authenticated_user_repository.clone(),
         user_authentication_request_repository,
         invite_link,

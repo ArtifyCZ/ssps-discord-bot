@@ -1,7 +1,8 @@
-use crate::authentication::user_authentication_request::UserAuthenticationRequest;
+use crate::authentication::authenticated_user::AuthenticatedUser;
 use crate::ports::oauth::OAuthToken;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use domain_shared::authentication::ArchivedUserId;
 use domain_shared::discord::UserId;
 use tracing::instrument;
 
@@ -9,9 +10,8 @@ pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
-pub struct AuthenticatedUser {
-    user_id: UserId,
+pub struct ArchivedAuthenticatedUser {
+    archived_user_id: ArchivedUserId,
     name: String,
     email: String,
     oauth_token: OAuthToken,
@@ -19,10 +19,20 @@ pub struct AuthenticatedUser {
     authenticated_at: DateTime<Utc>,
 }
 
-impl AuthenticatedUser {
+impl ArchivedAuthenticatedUser {
+    #[instrument(level = "trace", skip(self))]
+    pub fn archived_user_id(&self) -> ArchivedUserId {
+        self.archived_user_id
+    }
+
     #[instrument(level = "trace", skip(self))]
     pub fn user_id(&self) -> UserId {
-        self.user_id
+        self.archived_user_id.0
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn archived_at(&self) -> DateTime<Utc> {
+        self.archived_user_id.1
     }
 
     #[instrument(level = "trace", skip(self))]
@@ -36,25 +46,8 @@ impl AuthenticatedUser {
     }
 
     #[instrument(level = "trace", skip(self))]
-    pub fn set_user_info(&mut self, name: String, email: String, class_id: String) {
-        self.name = name;
-        self.email = email;
-        self.class_id = class_id;
-    }
-
-    #[instrument(level = "trace", skip(self))]
-    pub fn set_class_id(&mut self, class_id: String) {
-        self.class_id = class_id;
-    }
-
-    #[instrument(level = "trace", skip(self))]
     pub fn oauth_token(&self) -> &OAuthToken {
         &self.oauth_token
-    }
-
-    #[instrument(level = "trace", skip(self, oauth_token))]
-    pub fn update_oauth_token(&mut self, oauth_token: OAuthToken) {
-        self.oauth_token = oauth_token;
     }
 
     #[instrument(level = "trace", skip(self))]
@@ -68,29 +61,35 @@ impl AuthenticatedUser {
     }
 }
 
-#[instrument(level = "trace", skip(request, oauth_token))]
-pub fn create_user_from_successful_authentication(
-    request: &UserAuthenticationRequest,
-    name: String,
-    email: String,
-    oauth_token: OAuthToken,
-    class_id: String,
-) -> AuthenticatedUser {
-    AuthenticatedUser {
-        user_id: request.user_id(),
+#[instrument(level = "trace")]
+pub fn create_archived_authenticated_user_from_user(
+    user: &AuthenticatedUser,
+) -> ArchivedAuthenticatedUser {
+    let user_id = user.user_id();
+    let archived_at = Utc::now();
+
+    let archived_user_id = ArchivedUserId(user_id, archived_at);
+    let name = user.name().to_string();
+    let email = user.email().to_string();
+    let oauth_token = user.oauth_token().clone();
+    let class_id = user.class_id().to_string();
+    let authenticated_at = user.authenticated_at();
+
+    ArchivedAuthenticatedUser {
+        archived_user_id,
         name,
         email,
         oauth_token,
         class_id,
-        authenticated_at: Utc::now(),
+        authenticated_at,
     }
 }
 
-impl AuthenticatedUser {
+impl ArchivedAuthenticatedUser {
     #[instrument(level = "trace", skip(snapshot))]
-    pub fn from_snapshot(snapshot: AuthenticatedUserSnapshot) -> Self {
+    pub fn from_snapshot(snapshot: ArchivedAuthenticatedUserSnapshot) -> Self {
         Self {
-            user_id: snapshot.user_id,
+            archived_user_id: snapshot.archived_user_id,
             name: snapshot.name,
             email: snapshot.email,
             oauth_token: snapshot.oauth_token,
@@ -100,9 +99,9 @@ impl AuthenticatedUser {
     }
 
     #[instrument(level = "trace", skip(self))]
-    pub fn to_snapshot(&self) -> AuthenticatedUserSnapshot {
-        AuthenticatedUserSnapshot {
-            user_id: self.user_id,
+    pub fn to_snapshot(&self) -> ArchivedAuthenticatedUserSnapshot {
+        ArchivedAuthenticatedUserSnapshot {
+            archived_user_id: self.archived_user_id,
             name: self.name.clone(),
             email: self.email.clone(),
             oauth_token: self.oauth_token.clone(),
@@ -113,8 +112,8 @@ impl AuthenticatedUser {
 }
 
 #[derive(Clone)]
-pub struct AuthenticatedUserSnapshot {
-    pub user_id: UserId,
+pub struct ArchivedAuthenticatedUserSnapshot {
+    pub archived_user_id: ArchivedUserId,
     pub name: String,
     pub email: String,
     pub oauth_token: OAuthToken,
@@ -124,10 +123,6 @@ pub struct AuthenticatedUserSnapshot {
 
 #[cfg_attr(feature = "mock", mockall::automock)]
 #[async_trait]
-pub trait AuthenticatedUserRepository {
-    async fn save(&self, user: &AuthenticatedUser) -> Result<()>;
-    async fn remove(&self, user_id: UserId) -> Result<()>;
-    async fn find_all(&self) -> Result<Vec<AuthenticatedUser>>;
-    async fn find_by_user_id(&self, user_id: UserId) -> Result<Option<AuthenticatedUser>>;
-    async fn find_by_email(&self, email: &str) -> Result<Option<AuthenticatedUser>>;
+pub trait ArchivedAuthenticatedUserRepository {
+    async fn save(&self, user: &ArchivedAuthenticatedUser) -> Result<()>;
 }

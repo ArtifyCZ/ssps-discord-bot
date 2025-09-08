@@ -910,6 +910,7 @@ dependencies = [
 name = "domain-shared"
 version = "0.0.0"
 dependencies = [
+ "chrono",
  "serde",
 ]
 

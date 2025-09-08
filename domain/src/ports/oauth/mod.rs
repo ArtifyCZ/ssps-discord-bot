@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use domain_shared::authentication::{
     AccessToken, AuthenticationLink, ClientCallbackToken, CsrfToken, RefreshToken, UserGroup,
 };
+use std::fmt::Debug;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Result<T> = std::result::Result<T, crate::ports::discord::Error>;

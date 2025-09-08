@@ -5,3 +5,7 @@
 /httpRequests/
 
 git_toolbox_prj.xml
+
+dataSources/
+dataSources.xml
+dataSources.local.xml

@@ -96,6 +96,18 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
     }
 
     #[instrument(level = "debug", err, skip(self))]
+    async fn remove(&self, user_id: UserId) -> Result<()> {
+        query!(
+            "DELETE FROM authenticated_users WHERE user_id = $1",
+            user_id.0 as i64,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    #[instrument(level = "debug", err, skip(self))]
     async fn find_all(&self) -> Result<Vec<AuthenticatedUser>> {
         let rows = query!(
             "SELECT user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at FROM authenticated_users",

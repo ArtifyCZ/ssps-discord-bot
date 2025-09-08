@@ -1,6 +1,9 @@
 use application_ports::authentication::{AuthenticationError, AuthenticationPort};
 use application_ports::discord::InviteLink;
 use async_trait::async_trait;
+use domain::authentication::archived_authenticated_user::{
+    create_archived_authenticated_user_from_user, ArchivedAuthenticatedUserRepository,
+};
 use domain::authentication::authenticated_user::{
     create_user_from_successful_authentication, AuthenticatedUserRepository,
 };
@@ -19,6 +22,8 @@ use tracing::{info, instrument, warn, Span};
 pub struct AuthenticationService {
     discord_port: Arc<dyn DiscordPort + Send + Sync>,
     oauth_port: Arc<dyn OAuthPort + Send + Sync>,
+    archived_authenticated_user_repository:
+        Arc<dyn ArchivedAuthenticatedUserRepository + Send + Sync>,
     authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
     user_authentication_request_repository:
         Arc<dyn UserAuthenticationRequestRepository + Send + Sync>,
@@ -31,6 +36,9 @@ impl AuthenticationService {
     pub fn new(
         discord_port: Arc<dyn DiscordPort + Send + Sync>,
         oauth_port: Arc<dyn OAuthPort + Send + Sync>,
+        archived_authenticated_user_repository: Arc<
+            dyn ArchivedAuthenticatedUserRepository + Send + Sync,
+        >,
         authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
         user_authentication_request_repository: Arc<
             dyn UserAuthenticationRequestRepository + Send + Sync,
@@ -41,6 +49,7 @@ impl AuthenticationService {
         Self {
             discord_port,
             oauth_port,
+            archived_authenticated_user_repository,
             authenticated_user_repository,
             user_authentication_request_repository,
             invite_link,
@@ -128,7 +137,26 @@ impl AuthenticationPort for AuthenticationService {
                 email = user.email(),
                 "User tried to authenticate with an already used email"
             );
-            return Err(AuthenticationError::EmailAlreadyInUse);
+            let archived_user = create_archived_authenticated_user_from_user(&user);
+            self.archived_authenticated_user_repository
+                .save(&archived_user)
+                .await?;
+            self.authenticated_user_repository
+                .remove(user.user_id())
+                .await?;
+
+            let audit_log_reason =
+                "Removed user roles due to new user authenticating with the same email";
+
+            self.discord_port
+                .remove_user_from_class_roles(user.user_id(), Some(audit_log_reason))
+                .await?;
+
+            for role in &self.additional_student_roles {
+                self.discord_port
+                    .remove_user_from_role(user.user_id(), *role, Some(audit_log_reason))
+                    .await?;
+            }
         }
 
         let user = create_user_from_successful_authentication(
@@ -174,6 +202,7 @@ impl AuthenticationPort for AuthenticationService {
 mod tests {
     use super::*;
     use chrono::{Duration, Utc};
+    use domain::authentication::archived_authenticated_user::MockArchivedAuthenticatedUserRepository;
     use domain::authentication::authenticated_user::{
         AuthenticatedUser, AuthenticatedUserSnapshot, MockAuthenticatedUserRepository,
     };
@@ -188,17 +217,20 @@ mod tests {
     fn setup_mocks() -> (
         MockDiscordPort,
         MockOAuthPort,
+        MockArchivedAuthenticatedUserRepository,
         MockAuthenticatedUserRepository,
         MockUserAuthenticationRequestRepository,
     ) {
         let discord_port = MockDiscordPort::new();
         let oauth_port = MockOAuthPort::new();
+        let archived_authenticated_user_repository = MockArchivedAuthenticatedUserRepository::new();
         let authenticated_user_repository = MockAuthenticatedUserRepository::new();
         let user_authentication_request_repository = MockUserAuthenticationRequestRepository::new();
 
         (
             discord_port,
             oauth_port,
+            archived_authenticated_user_repository,
             authenticated_user_repository,
             user_authentication_request_repository,
         )
@@ -208,6 +240,7 @@ mod tests {
     fn create_service(
         discord_port: MockDiscordPort,
         oauth_port: MockOAuthPort,
+        archived_authenticated_user_repository: MockArchivedAuthenticatedUserRepository,
         authenticated_user_repository: MockAuthenticatedUserRepository,
         user_authentication_request_repository: MockUserAuthenticationRequestRepository,
     ) -> AuthenticationService {
@@ -216,6 +249,7 @@ mod tests {
         AuthenticationService::new(
             Arc::new(discord_port),
             Arc::new(oauth_port),
+            Arc::new(archived_authenticated_user_repository),
             Arc::new(authenticated_user_repository),
             Arc::new(user_authentication_request_repository),
             invite_link,
@@ -225,8 +259,13 @@ mod tests {
 
     #[tokio::test]
     async fn create_authentication_link_already_authenticated() {
-        let (discord_port, oauth_port, mut authenticated_user_repo, user_auth_request_repo) =
-            setup_mocks();
+        let (
+            discord_port,
+            oauth_port,
+            archived_authenticated_user_repo,
+            mut authenticated_user_repo,
+            user_auth_request_repo,
+        ) = setup_mocks();
         let user_id = UserId(12345);
 
         let name = "Test User".to_string();
@@ -262,6 +301,7 @@ mod tests {
         let service = create_service(
             discord_port,
             oauth_port,
+            archived_authenticated_user_repo,
             authenticated_user_repo,
             user_auth_request_repo,
         );
@@ -277,8 +317,13 @@ mod tests {
 
     #[tokio::test]
     async fn create_authentication_link_success() {
-        let (discord_port, mut oauth_port, mut authenticated_user_repo, mut user_auth_request_repo) =
-            setup_mocks();
+        let (
+            discord_port,
+            mut oauth_port,
+            archived_authenticated_user_repo,
+            mut authenticated_user_repo,
+            mut user_auth_request_repo,
+        ) = setup_mocks();
         let user_id = UserId(98765);
         let expected_link = AuthenticationLink("http://oauth.com/auth?csrf=...&...".to_string());
         let expected_csrf_token = CsrfToken("random_csrf_token".to_string());
@@ -306,6 +351,7 @@ mod tests {
         let service = create_service(
             discord_port,
             oauth_port,
+            archived_authenticated_user_repo,
             authenticated_user_repo,
             user_auth_request_repo,
         );
@@ -322,6 +368,7 @@ mod tests {
         let (
             discord_port,
             oauth_port,
+            archived_authenticated_user_repo,
             authenticated_user_repo,
             mut user_auth_request_repo, // mut because expect_find_by_csrf_token is called
         ) = setup_mocks();
@@ -338,6 +385,7 @@ mod tests {
         let service = create_service(
             discord_port,
             oauth_port,
+            archived_authenticated_user_repo,
             authenticated_user_repo,
             user_auth_request_repo,
         );
@@ -354,130 +402,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn confirm_authentication_email_already_in_use() {
-        let (discord_port, mut oauth_port, mut authenticated_user_repo, mut user_auth_request_repo) =
-            setup_mocks();
-
-        let user_id = UserId(12345); // ID from the original request
-        let csrf_token = CsrfToken("valid_csrf_token".to_string());
-        let client_callback_token = ClientCallbackToken("callback_code".to_string());
-        let oauth_access_token = AccessToken("oauth_access".to_string());
-        let oauth_refresh_token = RefreshToken("oauth_refresh".to_string());
-        let oauth_expires_at = Utc::now() + Duration::hours(1);
-        let oauth_token = OAuthToken {
-            access_token: oauth_access_token.clone(),
-            refresh_token: oauth_refresh_token.clone(),
-            expires_at: oauth_expires_at,
-        };
-        let class_group_id = "1a".to_string();
-        let class_group_mail = format!("{}@ssps.cz", class_group_id);
-        let user_groups = vec![UserGroup {
-            id: "group_id".to_string(),
-            name: class_group_id.clone(),
-            mail: Some(class_group_mail.clone()),
-        }];
-        let user_name = "Test User".to_string();
-        let user_email = "existing@example.com".to_string();
-        let existing_user_id = UserId(99999); // Different user ID
-
-        // Mock finding the original request
-        use domain::authentication::user_authentication_request::UserAuthenticationRequest;
-        use domain::authentication::user_authentication_request::UserAuthenticationRequestSnapshot;
-        let request_time = Utc::now() - Duration::minutes(5);
-        let request = UserAuthenticationRequest::from_snapshot(UserAuthenticationRequestSnapshot {
-            csrf_token: csrf_token.clone(),
-            user_id, // User ID from request
-            requested_at: request_time,
-        });
-        let request_snapshot = request.to_snapshot();
-        user_auth_request_repo
-            .expect_find_by_csrf_token()
-            .with(mockall::predicate::eq(csrf_token.clone()))
-            .times(1)
-            .returning(move |_| {
-                Ok(Some(UserAuthenticationRequest::from_snapshot(
-                    request_snapshot.clone(),
-                )))
-            });
-
-        // Mock OAuth flow
-        let oauth_token_clone = oauth_token.clone();
-        oauth_port
-            .expect_exchange_code_after_callback()
-            .with(mockall::predicate::eq(client_callback_token.clone())) // Need to clone ClientCallbackToken too
-            .times(1)
-            .returning(move |_| Ok(oauth_token_clone.clone()));
-
-        let user_groups_clone = user_groups.clone();
-        oauth_port
-            .expect_get_user_groups()
-            .with(mockall::predicate::eq(oauth_access_token.clone()))
-            .times(1)
-            .returning(move |_| Ok(user_groups_clone.clone()));
-
-        let user_name_clone = user_name.clone();
-        let user_email_clone = user_email.clone();
-        oauth_port
-            .expect_get_user_info()
-            .with(mockall::predicate::eq(oauth_access_token.clone()))
-            .times(1)
-            .returning(move |_| {
-                Ok(UserInfoDto {
-                    name: user_name_clone.clone(),
-                    email: user_email_clone.clone(),
-                })
-            });
-
-        // Mock finding an existing user with the same email
-        let existing_user_oauth_token = OAuthToken {
-            access_token: AccessToken("existing_access".to_string()),
-            refresh_token: RefreshToken("existing_refresh".to_string()),
-            expires_at: Utc::now() + Duration::hours(1),
-        };
-        let existing_user = AuthenticatedUser::from_snapshot(AuthenticatedUserSnapshot {
-            user_id: existing_user_id,
-            name: "Existing User".to_string(),
-            email: user_email.clone(), // Same email
-            class_id: "2b".to_string(),
-            oauth_token: existing_user_oauth_token,
-            authenticated_at: Utc::now() - Duration::days(2),
-        });
-        let existing_user_snapshot_for_find = existing_user.to_snapshot();
-        authenticated_user_repo
-            .expect_find_by_email()
-            .with(mockall::predicate::eq(user_email.clone()))
-            .times(1)
-            .returning(move |_| {
-                Ok(Some(AuthenticatedUser::from_snapshot(
-                    existing_user_snapshot_for_find.clone(),
-                )))
-            });
-
-        // No save or remove should happen
-
-        let service = create_service(
-            discord_port,
-            oauth_port,
-            authenticated_user_repo,
-            user_auth_request_repo,
-        );
-
-        let result = service
-            .confirm_authentication(csrf_token, client_callback_token)
-            .await;
-
-        assert!(result.is_err());
-        match result.err().unwrap() {
-            AuthenticationError::EmailAlreadyInUse => {}
-            other => panic!("Expected EmailAlreadyInUse, got {:?}", other),
-        }
-    }
-
-    #[tokio::test]
     async fn confirm_authentication_success() {
         let (
             mut discord_port, // mut for role changes
             mut oauth_port,
+            archived_authenticated_user_repo,
             mut authenticated_user_repo,
             mut user_auth_request_repo,
         ) = setup_mocks();
@@ -661,6 +590,7 @@ mod tests {
         let service = create_service(
             discord_port,
             oauth_port,
+            archived_authenticated_user_repo,
             authenticated_user_repo,
             user_auth_request_repo,
         );
