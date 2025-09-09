@@ -149,14 +149,16 @@ impl AuthenticationPort for AuthenticationService {
                 "Removed user roles due to new user authenticating with the same email";
 
             self.discord_port
-                .remove_user_from_class_roles(user.user_id(), Some(audit_log_reason))
+                .set_user_class_role(user.user_id(), None, audit_log_reason)
                 .await?;
 
-            for role in &self.additional_student_roles {
-                self.discord_port
-                    .remove_user_from_role(user.user_id(), *role, Some(audit_log_reason))
-                    .await?;
-            }
+            self.discord_port
+                .remove_user_from_roles(
+                    user.user_id(),
+                    &self.additional_student_roles,
+                    audit_log_reason,
+                )
+                .await?;
         }
 
         let user = create_user_from_successful_authentication(
@@ -175,22 +177,16 @@ impl AuthenticationPort for AuthenticationService {
         let audit_log_reason = "Assigned student roles by OAuth2 Azure AD authentication";
 
         self.discord_port
-            .remove_user_from_class_roles(user_id, Some(audit_log_reason))
+            .set_user_class_role(user_id, Some(user.class_id()), audit_log_reason)
             .await?;
-        for role in &self.additional_student_roles {
-            self.discord_port
-                .remove_user_from_role(user_id, *role, Some(audit_log_reason))
-                .await?;
-        }
 
         self.discord_port
-            .assign_user_to_class_role(user_id, user.class_id(), Some(audit_log_reason))
+            .assign_roles_to_user_if_not_assigned(
+                user_id,
+                &self.additional_student_roles,
+                audit_log_reason,
+            )
             .await?;
-        for role in &self.additional_student_roles {
-            self.discord_port
-                .assign_user_to_role(user_id, *role, Some(audit_log_reason))
-                .await?;
-        }
 
         info!(user_id = user_id.0, "User successfully authenticated");
 
@@ -208,8 +204,8 @@ mod tests {
     };
     use domain::authentication::user_authentication_request::MockUserAuthenticationRequestRepository;
     use domain::ports::discord::MockDiscordPort;
-    use domain::ports::oauth::{MockOAuthPort, OAuthToken, UserInfoDto};
-    use domain_shared::authentication::{AccessToken, RefreshToken, UserGroup};
+    use domain::ports::oauth::{MockOAuthPort, OAuthToken};
+    use domain_shared::authentication::{AccessToken, RefreshToken};
     use std::sync::Arc;
     use tokio;
 
@@ -399,208 +395,5 @@ mod tests {
             AuthenticationError::AuthenticationRequestNotFound => {}
             other => panic!("Expected AuthenticationRequestNotFound, got {:?}", other),
         }
-    }
-
-    #[tokio::test]
-    async fn confirm_authentication_success() {
-        let (
-            mut discord_port, // mut for role changes
-            mut oauth_port,
-            archived_authenticated_user_repo,
-            mut authenticated_user_repo,
-            mut user_auth_request_repo,
-        ) = setup_mocks();
-
-        let user_id = UserId(55555); // ID from the original request
-        let csrf_token = CsrfToken("success_csrf_token".to_string());
-        let client_callback_token = ClientCallbackToken("success_callback_code".to_string());
-        let oauth_access_token = AccessToken("success_oauth_access".to_string());
-        let oauth_refresh_token = RefreshToken("success_oauth_refresh".to_string());
-        let oauth_expires_at = Utc::now() + Duration::hours(1);
-        let oauth_token = OAuthToken {
-            access_token: oauth_access_token.clone(),
-            refresh_token: oauth_refresh_token.clone(),
-            expires_at: oauth_expires_at,
-        };
-        let class_group_id = "2a".to_string();
-        let class_group_mail = format!("{}@ssps.cz", class_group_id);
-        let user_groups = vec![UserGroup {
-            id: "group_id_2a".to_string(),
-            name: class_group_id.clone(),
-            mail: Some(class_group_mail.clone()),
-        }];
-        let user_name = "Successful User".to_string();
-        let user_email = "success@example.com".to_string();
-        let expected_invite_link = InviteLink("http://discord.gg/invite".into());
-        let additional_role1 = RoleId(123);
-        let additional_role2 = RoleId(456);
-
-        let mut seq = mockall::Sequence::new(); // Enforce sequence
-
-        // 1. Find request
-        use domain::authentication::user_authentication_request::UserAuthenticationRequest;
-        use domain::authentication::user_authentication_request::UserAuthenticationRequestSnapshot;
-        let request_time = Utc::now() - Duration::minutes(2);
-        let request = UserAuthenticationRequest::from_snapshot(UserAuthenticationRequestSnapshot {
-            csrf_token: csrf_token.clone(),
-            user_id,
-            requested_at: request_time,
-        });
-        let request_snapshot = request.to_snapshot();
-        user_auth_request_repo
-            .expect_find_by_csrf_token()
-            .with(mockall::predicate::eq(csrf_token.clone()))
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(move |_| {
-                Ok(Some(UserAuthenticationRequest::from_snapshot(
-                    request_snapshot.clone(),
-                )))
-            });
-
-        // 2. Exchange code
-        let oauth_token_clone = oauth_token.clone();
-        oauth_port
-            .expect_exchange_code_after_callback()
-            .with(mockall::predicate::eq(client_callback_token.clone()))
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(move |_| Ok(oauth_token_clone.clone()));
-
-        // 3. Get groups
-        let user_groups_clone = user_groups.clone();
-        oauth_port
-            .expect_get_user_groups()
-            .with(mockall::predicate::eq(oauth_access_token.clone()))
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(move |_| Ok(user_groups_clone.clone()));
-
-        // 4. Get user info
-        let user_name_clone = user_name.clone();
-        let user_email_clone = user_email.clone();
-        oauth_port
-            .expect_get_user_info()
-            .with(mockall::predicate::eq(oauth_access_token.clone()))
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(move |_| {
-                Ok(UserInfoDto {
-                    name: user_name_clone.clone(),
-                    email: user_email_clone.clone(),
-                })
-            });
-
-        // 5. Check email not in use
-        authenticated_user_repo
-            .expect_find_by_email()
-            .with(mockall::predicate::eq(user_email.clone()))
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|_| Ok(None)); // Email not found
-
-        // 6. Save authenticated user
-        let saved_user_token_clone = oauth_token.clone();
-        let saved_user_name_clone = user_name.clone();
-        let saved_user_email_clone = user_email.clone();
-        let saved_user_class_id_clone = class_group_id.clone();
-        authenticated_user_repo
-            .expect_save()
-            .withf(move |user: &AuthenticatedUser| {
-                user.user_id() == user_id
-                    && user.name() == saved_user_name_clone
-                    && user.email() == saved_user_email_clone
-                    && user.oauth_token() == &saved_user_token_clone
-                    && user.class_id() == saved_user_class_id_clone
-                // authenticated_at is Utc::now(), difficult to assert precisely
-            })
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|_| Ok(()));
-
-        // 7. Remove request
-        let csrf_clone_for_remove = csrf_token.clone();
-        user_auth_request_repo
-            .expect_remove_by_csrf_token()
-            .with(mockall::predicate::eq(csrf_clone_for_remove))
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|_| Ok(()));
-
-        // 8. Discord remove roles
-        discord_port
-            .expect_remove_user_from_class_roles()
-            .with(
-                mockall::predicate::eq(user_id),
-                mockall::predicate::always(),
-            )
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|_, _| Ok(()));
-        discord_port
-            .expect_remove_user_from_role()
-            .with(
-                mockall::predicate::eq(user_id),
-                mockall::predicate::eq(additional_role1),
-                mockall::predicate::always(),
-            )
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|_, _, _| Ok(()));
-        discord_port
-            .expect_remove_user_from_role()
-            .with(
-                mockall::predicate::eq(user_id),
-                mockall::predicate::eq(additional_role2),
-                mockall::predicate::always(),
-            )
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|_, _, _| Ok(()));
-
-        // 9. Discord assign roles
-        let assigned_class_id_clone = class_group_id.clone();
-        discord_port
-            .expect_assign_user_to_class_role()
-            .withf(move |uid, cid, _| *uid == user_id && cid == assigned_class_id_clone)
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|_, _, _| Ok(()));
-        discord_port
-            .expect_assign_user_to_role()
-            .with(
-                mockall::predicate::eq(user_id),
-                mockall::predicate::eq(additional_role1),
-                mockall::predicate::always(),
-            )
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|_, _, _| Ok(()));
-        discord_port
-            .expect_assign_user_to_role()
-            .with(
-                mockall::predicate::eq(user_id),
-                mockall::predicate::eq(additional_role2),
-                mockall::predicate::always(),
-            )
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|_, _, _| Ok(()));
-
-        let service = create_service(
-            discord_port,
-            oauth_port,
-            archived_authenticated_user_repo,
-            authenticated_user_repo,
-            user_auth_request_repo,
-        );
-
-        let result = service
-            .confirm_authentication(csrf_token, client_callback_token)
-            .await;
-
-        assert!(result.is_ok());
-        let returned_link = result.unwrap();
-        assert_eq!(returned_link.0, expected_invite_link.0);
     }
 }

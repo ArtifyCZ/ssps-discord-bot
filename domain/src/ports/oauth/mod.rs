@@ -6,7 +6,7 @@ use domain_shared::authentication::{
 use std::fmt::Debug;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-pub type Result<T> = std::result::Result<T, crate::ports::discord::Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[cfg_attr(feature = "mock", mockall::automock)]
 #[async_trait]

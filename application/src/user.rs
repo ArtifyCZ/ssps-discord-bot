@@ -96,11 +96,7 @@ impl UserPort for UserService {
         let audit_log_reason = "Assigned student roles by OAuth2 Azure AD authentication";
 
         self.discord_port
-            .remove_user_from_class_roles(user_id, Some(audit_log_reason))
-            .await?;
-
-        self.discord_port
-            .assign_user_to_class_role(user_id, user.class_id(), Some(audit_log_reason))
+            .set_user_class_role(user_id, Some(user.class_id()), audit_log_reason)
             .await?;
 
         info!(
