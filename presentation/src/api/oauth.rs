@@ -29,9 +29,6 @@ pub async fn callback_handler<L: Locator>(
             warn!("Error during authentication: {:?}", error);
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
-        Err(AuthenticationError::AlreadyAuthenticated) => {
-            return StatusCode::NO_CONTENT.into_response()
-        }
         Err(AuthenticationError::AuthenticationRequestNotFound) => {
             warn!("Authentication request not found");
             return Redirect::to("/").into_response();

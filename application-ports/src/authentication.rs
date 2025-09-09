@@ -21,8 +21,6 @@ pub trait AuthenticationPort {
 pub enum AuthenticationError {
     #[error(transparent)]
     Error(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
-    #[error("User has already been authenticated")]
-    AlreadyAuthenticated,
     #[error("User authentication request was not found")]
     AuthenticationRequestNotFound,
 }

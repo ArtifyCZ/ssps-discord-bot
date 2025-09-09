@@ -65,15 +65,6 @@ impl AuthenticationPort for AuthenticationService {
         &self,
         user_id: UserId,
     ) -> Result<AuthenticationLink, AuthenticationError> {
-        if let Some(_user) = self
-            .authenticated_user_repository
-            .find_by_user_id(user_id)
-            .await?
-        {
-            info!(user_id = user_id.0, "The user tried to authenticate again");
-            return Err(AuthenticationError::AlreadyAuthenticated);
-        }
-
         let (link, csrf_token) = self.oauth_port.create_authentication_link().await?;
 
         let request = create_user_authentication_request(csrf_token, user_id);
@@ -197,15 +188,11 @@ impl AuthenticationPort for AuthenticationService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{Duration, Utc};
     use domain::authentication::archived_authenticated_user::MockArchivedAuthenticatedUserRepository;
-    use domain::authentication::authenticated_user::{
-        AuthenticatedUser, AuthenticatedUserSnapshot, MockAuthenticatedUserRepository,
-    };
+    use domain::authentication::authenticated_user::MockAuthenticatedUserRepository;
     use domain::authentication::user_authentication_request::MockUserAuthenticationRequestRepository;
     use domain::ports::discord::MockDiscordPort;
-    use domain::ports::oauth::{MockOAuthPort, OAuthToken};
-    use domain_shared::authentication::{AccessToken, RefreshToken};
+    use domain::ports::oauth::MockOAuthPort;
     use std::sync::Arc;
     use tokio;
 
@@ -254,81 +241,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn create_authentication_link_already_authenticated() {
-        let (
-            discord_port,
-            oauth_port,
-            archived_authenticated_user_repo,
-            mut authenticated_user_repo,
-            user_auth_request_repo,
-        ) = setup_mocks();
-        let user_id = UserId(12345);
-
-        let name = "Test User".to_string();
-        let email = "test@example.com".to_string();
-        let class_id = "1a".to_string();
-        let expires_at = Utc::now() + Duration::hours(1);
-        let oauth_token = OAuthToken {
-            access_token: AccessToken("access".to_string()),
-            refresh_token: RefreshToken("refresh".to_string()),
-            expires_at,
-        };
-        let authenticated_at = Utc::now();
-        let existing_user = AuthenticatedUser::from_snapshot(AuthenticatedUserSnapshot {
-            user_id,
-            name: name.clone(),
-            email: email.clone(),
-            class_id: class_id.clone(),
-            oauth_token: oauth_token.clone(),
-            authenticated_at,
-        });
-        let existing_user_snapshot = existing_user.to_snapshot();
-
-        authenticated_user_repo
-            .expect_find_by_user_id()
-            .with(mockall::predicate::eq(user_id))
-            .times(1)
-            .returning(move |_| {
-                Ok(Some(AuthenticatedUser::from_snapshot(
-                    existing_user_snapshot.clone(),
-                )))
-            });
-
-        let service = create_service(
-            discord_port,
-            oauth_port,
-            archived_authenticated_user_repo,
-            authenticated_user_repo,
-            user_auth_request_repo,
-        );
-
-        let result = service.create_authentication_link(user_id).await;
-
-        assert!(result.is_err());
-        match result.err().unwrap() {
-            AuthenticationError::AlreadyAuthenticated => {}
-            other => panic!("Expected AlreadyAuthenticated, got {:?}", other),
-        }
-    }
-
-    #[tokio::test]
     async fn create_authentication_link_success() {
         let (
             discord_port,
             mut oauth_port,
             archived_authenticated_user_repo,
-            mut authenticated_user_repo,
+            authenticated_user_repo,
             mut user_auth_request_repo,
         ) = setup_mocks();
         let user_id = UserId(98765);
         let expected_link = AuthenticationLink("http://oauth.com/auth?csrf=...&...".to_string());
         let expected_csrf_token = CsrfToken("random_csrf_token".to_string());
-
-        authenticated_user_repo
-            .expect_find_by_user_id()
-            .with(mockall::predicate::eq(user_id))
-            .times(1)
-            .returning(|_| Ok(None));
 
         let link_clone = expected_link.0.clone();
         let csrf_clone = expected_csrf_token.clone();

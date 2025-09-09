@@ -6,7 +6,7 @@ use poise::serenity_prelude::{
     ButtonStyle, CreateActionRow, CreateButton, CreateInteractionResponse, Mentionable,
 };
 use poise::{serenity_prelude as serenity, CreateReply};
-use tracing::{info, instrument, warn};
+use tracing::{info, instrument};
 
 pub const BUTTON_ID: &str = domain::information_channel::VERIFY_ME_BUTTON_ID;
 
@@ -29,27 +29,6 @@ pub async fn handle_button_click<L: Locator>(
         .await
     {
         Ok(link) => link,
-        Err(AuthenticationError::AlreadyAuthenticated) => {
-            warn!(
-                user_id = interaction.user.id.get(),
-                "User tried to create new authentication link, but is already authenticated."
-            );
-
-            let response =
-                "Již jsi byl ověřen. Není možné vytvořit další ověřovací odkaz.".to_string();
-
-            let response = CreateReply::default()
-                .content(response)
-                .ephemeral(true)
-                .reply(true);
-            let response = CreateInteractionResponse::Message(
-                response
-                    .to_slash_initial_response(serenity::CreateInteractionResponseMessage::new()),
-            );
-            interaction.create_response(ctx, response).await?;
-
-            return Ok(());
-        }
         Err(AuthenticationError::Error(error)) => return Err(error),
         Err(AuthenticationError::AuthenticationRequestNotFound) => unreachable!(),
     };
