@@ -77,11 +77,7 @@ impl UserPort for UserService {
             .get_user_info(&user.oauth_token().access_token)
             .await?;
 
-        let groups = self
-            .oauth_port
-            .get_user_groups(&user.oauth_token().access_token)
-            .await?;
-        let class_group = find_class_group(&groups)
+        let class_group = find_class_group(&user_info.groups)
             .ok_or_else(|| UserError::Error("User is not in the Class group".into()))?;
         let class_id = get_class_id(class_group)
             .ok_or_else(|| UserError::Error("User's class group ID not found".into()))?;

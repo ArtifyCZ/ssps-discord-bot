@@ -177,15 +177,7 @@ impl OAuthPort for OAuthAdapter {
             .await?;
         let UserInfoResponse { name, email } = serde_json::from_str(&user_info)?;
 
-        Ok(UserInfoDto { name, email })
-    }
-
-    #[instrument(level = "debug", err, skip(self, access_token))]
-    async fn get_user_groups(
-        &self,
-        access_token: &AccessToken,
-    ) -> domain::ports::oauth::Result<Vec<UserGroup>> {
-        let user_info = self
+        let user_groups = self
             .http_client
             .get("https://graph.microsoft.com/v1.0/me/memberOf")
             .bearer_auth(access_token.0.clone())
@@ -193,10 +185,13 @@ impl OAuthPort for OAuthAdapter {
             .await?
             .text()
             .await?;
+        let groups = serde_json::from_str::<UserGroupResponse>(&user_groups)?.value;
 
-        let user_groups: UserGroupResponse = serde_json::from_str(&user_info)?;
-
-        Ok(user_groups.value)
+        Ok(UserInfoDto {
+            name,
+            email,
+            groups,
+        })
     }
 }
 

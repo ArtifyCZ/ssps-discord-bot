@@ -18,7 +18,6 @@ pub trait OAuthPort {
     ) -> Result<OAuthToken>;
     async fn refresh_token(&self, oauth_token: &OAuthToken) -> Result<OAuthToken>;
     async fn get_user_info(&self, access_token: &AccessToken) -> Result<UserInfoDto>;
-    async fn get_user_groups(&self, access_token: &AccessToken) -> Result<Vec<UserGroup>>;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -32,4 +31,5 @@ pub struct OAuthToken {
 pub struct UserInfoDto {
     pub name: String,
     pub email: String,
+    pub groups: Vec<UserGroup>,
 }
