@@ -5,23 +5,23 @@ use crate::oauth::authentication_link::oauth_to_domain_authentication_link;
 use crate::oauth::csrf_token::oauth_to_domain_csrf_token;
 use async_trait::async_trait;
 use chrono::Utc;
-use domain::ports::oauth::{OAuthPort, OAuthToken, UserInfoDto};
+use domain::ports::oauth::{OAuthError, OAuthPort, OAuthToken, UserInfoDto};
 use domain_shared::authentication::{
     AccessToken, AuthenticationLink, ClientCallbackToken, CsrfToken, RefreshToken, UserGroup,
 };
 use oauth2::basic::{
-    BasicClient, BasicErrorResponse, BasicRevocationErrorResponse, BasicTokenIntrospectionResponse,
-    BasicTokenResponse,
+    BasicClient, BasicErrorResponse, BasicErrorResponseType, BasicRevocationErrorResponse,
+    BasicTokenIntrospectionResponse, BasicTokenResponse,
 };
 use oauth2::url::Url;
 use oauth2::{
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, EndpointNotSet, EndpointSet, RedirectUrl,
-    Scope, StandardRevocableToken, TokenResponse, TokenUrl,
+    RequestTokenError, Scope, StandardRevocableToken, TokenResponse, TokenUrl,
 };
 use reqwest::Client as HttpClient;
 use serde::Deserialize;
 use std::time::Duration;
-use tracing::instrument;
+use tracing::{instrument, warn};
 
 pub struct OAuthAdapter {
     oauth_client: OAuthClient,
@@ -133,13 +133,44 @@ impl OAuthPort for OAuthAdapter {
     async fn refresh_token(
         &self,
         oauth_token: &OAuthToken,
-    ) -> domain::ports::oauth::Result<OAuthToken> {
+    ) -> domain::ports::oauth::Result<OAuthToken, OAuthError> {
         let refresh_token = oauth2::RefreshToken::new(oauth_token.refresh_token.0.clone());
         let token_result = self
             .oauth_client
             .exchange_refresh_token(&refresh_token)
             .request_async(&self.http_client)
-            .await?;
+            .await
+            .map_err(|e| match e {
+                RequestTokenError::ServerResponse(err) => {
+                    match err.error() {
+                        BasicErrorResponseType::InvalidGrant => {
+                            // OAuth refresh token expired or revoked
+                            OAuthError::TokenExpired
+                        }
+                        BasicErrorResponseType::InvalidClient
+                        | BasicErrorResponseType::InvalidRequest
+                        | BasicErrorResponseType::InvalidScope
+                        | BasicErrorResponseType::UnauthorizedClient
+                        | BasicErrorResponseType::UnsupportedGrantType
+                        | BasicErrorResponseType::Extension(_) => {
+                            warn!("OAuth request failed with error: {:?}", err);
+                            OAuthError::OAuthUnavailable
+                        }
+                    }
+                }
+                RequestTokenError::Request(err) => {
+                    warn!("OAuth request failed with error: {:?}", err);
+                    OAuthError::OAuthUnavailable
+                }
+                RequestTokenError::Parse(err, _) => {
+                    warn!("OAuth request failed to parse response: {:?}", err);
+                    OAuthError::OAuthUnavailable
+                }
+                RequestTokenError::Other(err) => {
+                    warn!("Request failed with error: {:?}", err);
+                    OAuthError::OAuthUnavailable
+                }
+            })?;
 
         let access_token = AccessToken(token_result.access_token().secret().clone());
         let expires_at = Utc::now()
@@ -166,26 +197,50 @@ impl OAuthPort for OAuthAdapter {
     async fn get_user_info(
         &self,
         access_token: &AccessToken,
-    ) -> domain::ports::oauth::Result<UserInfoDto> {
+    ) -> domain::ports::oauth::Result<UserInfoDto, OAuthError> {
         let user_info = self
             .http_client
             .get("https://graph.microsoft.com/v1.0/me")
             .bearer_auth(access_token.0.clone())
             .send()
-            .await?
+            .await
+            .map_err(|err| {
+                warn!("Failed to get user info: {:?}", err);
+                OAuthError::OAuthUnavailable
+            })?
             .text()
-            .await?;
-        let UserInfoResponse { name, email } = serde_json::from_str(&user_info)?;
+            .await
+            .map_err(|err| {
+                warn!("Failed to get user info: {:?}", err);
+                OAuthError::OAuthUnavailable
+            })?;
+        let UserInfoResponse { name, email } = serde_json::from_str(&user_info).map_err(|err| {
+            warn!("Failed to parse user info: {:?}", err);
+            OAuthError::OAuthUnavailable
+        })?;
 
         let user_groups = self
             .http_client
             .get("https://graph.microsoft.com/v1.0/me/memberOf")
             .bearer_auth(access_token.0.clone())
             .send()
-            .await?
+            .await
+            .map_err(|err| {
+                warn!("Failed to get user groups: {:?}", err);
+                OAuthError::OAuthUnavailable
+            })?
             .text()
-            .await?;
-        let groups = serde_json::from_str::<UserGroupResponse>(&user_groups)?.value;
+            .await
+            .map_err(|err| {
+                warn!("Failed to get user groups: {:?}", err);
+                OAuthError::OAuthUnavailable
+            })?;
+        let groups = serde_json::from_str::<UserGroupResponse>(&user_groups)
+            .map_err(|err| {
+                warn!("Failed to parse user groups: {:?}", err);
+                OAuthError::OAuthUnavailable
+            })?
+            .value;
 
         Ok(UserInfoDto {
             name,

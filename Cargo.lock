@@ -903,6 +903,7 @@ dependencies = [
  "chrono",
  "domain-shared",
  "mockall",
+ "thiserror 2.0.16",
  "tracing",
 ]
 

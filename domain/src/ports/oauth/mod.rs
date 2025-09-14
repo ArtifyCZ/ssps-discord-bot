@@ -4,6 +4,7 @@ use domain_shared::authentication::{
     AccessToken, AuthenticationLink, ClientCallbackToken, CsrfToken, RefreshToken, UserGroup,
 };
 use std::fmt::Debug;
+use thiserror::Error;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -16,8 +17,8 @@ pub trait OAuthPort {
         &self,
         client_callback_token: ClientCallbackToken,
     ) -> Result<OAuthToken>;
-    async fn refresh_token(&self, oauth_token: &OAuthToken) -> Result<OAuthToken>;
-    async fn get_user_info(&self, access_token: &AccessToken) -> Result<UserInfoDto>;
+    async fn refresh_token(&self, oauth_token: &OAuthToken) -> Result<OAuthToken, OAuthError>;
+    async fn get_user_info(&self, access_token: &AccessToken) -> Result<UserInfoDto, OAuthError>;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -32,4 +33,12 @@ pub struct UserInfoDto {
     pub name: String,
     pub email: String,
     pub groups: Vec<UserGroup>,
+}
+
+#[derive(Debug, Error)]
+pub enum OAuthError {
+    #[error("OAuth is unavailable")]
+    OAuthUnavailable,
+    #[error("Refresh or access token has expired or was revoked")]
+    TokenExpired,
 }

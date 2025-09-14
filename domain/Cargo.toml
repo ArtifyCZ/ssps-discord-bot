@@ -7,6 +7,7 @@ domain-shared = { path = "../domain-shared" }
 
 async-trait = "0.1.87"
 chrono = "0.4.40"
+thiserror = "2.0"
 tracing = "0.1"
 mockall = { version = "0.13", optional = true }
 

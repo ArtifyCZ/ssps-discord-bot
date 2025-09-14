@@ -13,11 +13,11 @@ use domain::authentication::user_authentication_request::{
 use domain::class::class_group::find_class_group;
 use domain::class::class_id::get_class_id;
 use domain::ports::discord::DiscordPort;
-use domain::ports::oauth::OAuthPort;
+use domain::ports::oauth::{OAuthError, OAuthPort};
 use domain_shared::authentication::{AuthenticationLink, ClientCallbackToken, CsrfToken};
 use domain_shared::discord::{RoleId, UserId};
 use std::sync::Arc;
-use tracing::{info, instrument, warn, Span};
+use tracing::{error, info, instrument, warn, Span};
 
 pub struct AuthenticationService {
     discord_port: Arc<dyn DiscordPort + Send + Sync>,
@@ -108,7 +108,19 @@ impl AuthenticationPort for AuthenticationService {
         let user_info = self
             .oauth_port
             .get_user_info(&oauth_token.access_token)
-            .await?;
+            .await
+            .map_err(|err| match err {
+                OAuthError::OAuthUnavailable => {
+                    AuthenticationError::Error("OAuth is unavailable".into())
+                }
+                OAuthError::TokenExpired => {
+                    error!(
+                        user_id = user_id.0,
+                        "User's OAuth token expired during authentication process",
+                    );
+                    AuthenticationError::Error("OAuth token expired".into())
+                }
+            })?;
         let class_group = find_class_group(&user_info.groups)
             .ok_or_else(|| AuthenticationError::Error("User is not in the Class group".into()))?;
         let class_id = get_class_id(class_group)

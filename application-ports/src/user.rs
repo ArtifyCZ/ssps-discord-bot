@@ -14,10 +14,10 @@ pub trait UserPort {
 
 #[derive(Debug, Error)]
 pub enum UserError {
-    #[error(transparent)]
-    Error(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
     #[error("Authenticated user not found")]
     AuthenticatedUserNotFound,
+    #[error("Service is temporarily unavailable")]
+    TemporaryUnavailable,
 }
 
 pub struct AuthenticatedUserInfoDto {
