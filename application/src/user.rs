@@ -4,7 +4,7 @@ use chrono::Utc;
 use domain::authentication::authenticated_user::AuthenticatedUserRepository;
 use domain::class::class_group::find_class_group;
 use domain::class::class_id::get_class_id;
-use domain::ports::discord::DiscordPort;
+use domain::ports::discord::{DiscordError, DiscordPort};
 use domain::ports::oauth::{OAuthError, OAuthPort};
 use domain_shared::discord::UserId;
 use std::sync::Arc;
@@ -156,22 +156,27 @@ impl UserPort for UserService {
 
         let audit_log_reason = "Assigned student roles by OAuth2 Azure AD authentication";
 
-        match self
+        let class_role_id = self
             .discord_port
-            .set_user_class_role(user_id, Some(user.class_id()), audit_log_reason)
+            .find_class_role(user.class_id())
             .await
-        {
-            Ok(()) => {}
-            Err(err) => {
-                // @TODO: implement proper error handling
-                warn!(
-                    user_id = user.user_id().0,
-                    error = ?err,
-                    "Failed to set user's class role in Discord",
+            .map_err(|err| match err {
+                DiscordError::DiscordUnavailable => UserError::TemporaryUnavailable,
+            })?
+            .ok_or_else(|| {
+                error!(
+                    class_id = user.class_id(),
+                    "Could not find class role ID for class ID",
                 );
-                return Err(UserError::TemporaryUnavailable);
-            }
-        };
+                UserError::TemporaryUnavailable
+            })?;
+
+        self.discord_port
+            .assign_user_role(user.user_id(), class_role_id, audit_log_reason)
+            .await
+            .map_err(|err| match err {
+                DiscordError::DiscordUnavailable => UserError::TemporaryUnavailable,
+            })?;
 
         info!(
             user_id = user.user_id().0,

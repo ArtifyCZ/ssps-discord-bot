@@ -10,6 +10,7 @@ pub use create_button::{ButtonId, ButtonKind, CreateButton};
 pub use create_message::CreateMessage;
 pub use domain_shared::discord::ChannelId;
 use domain_shared::discord::{RoleId, UserId};
+use thiserror::Error;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -21,28 +22,29 @@ pub trait DiscordPort {
 
     async fn purge_messages(&self, channel_id: ChannelId) -> Result<()>;
 
-    async fn assign_roles_to_user_if_not_assigned(
+    async fn assign_user_role(
         &self,
         user_id: UserId,
-        role_ids: &[RoleId],
+        role_id: RoleId,
         reason: &str,
-    ) -> Result<()>;
+    ) -> Result<(), DiscordError>;
 
-    async fn remove_user_from_roles(
+    async fn remove_user_role(
         &self,
         user_id: UserId,
-        role_id: &[RoleId],
+        role_id: RoleId,
         reason: &str,
-    ) -> Result<()>;
+    ) -> Result<(), DiscordError>;
 
-    /// This function should assign the provided classes' role to the user and remove the user from
-    /// all other class roles if the user has any other assigned. This function should NOT make any
-    /// changes if the user is already assigned to the provided class role only. Please note that
-    /// if the provided class id is None, the user will be removed from all the class roles.
-    async fn set_user_class_role<'a>(
-        &self,
-        user_id: UserId,
-        class_id: Option<&'a str>,
-        reason: &str,
-    ) -> Result<()>;
+    async fn find_user_roles(&self, user_id: UserId) -> Result<Vec<RoleId>, DiscordError>;
+
+    async fn find_role_name(&self, role_id: RoleId) -> Result<Option<String>, DiscordError>;
+
+    async fn find_class_role(&self, class_id: &str) -> Result<Option<RoleId>, DiscordError>;
+}
+
+#[derive(Debug, Error)]
+pub enum DiscordError {
+    #[error("Discord is unavailable")]
+    DiscordUnavailable,
 }

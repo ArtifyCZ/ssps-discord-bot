@@ -29,6 +29,10 @@ pub async fn handle_button_click<L: Locator>(
         .await
     {
         Ok(link) => link,
+        Err(AuthenticationError::TemporaryUnavailable) => {
+            todo!()
+            // send an ephemeral response to the user
+        }
         Err(AuthenticationError::Error(error)) => return Err(error),
         Err(AuthenticationError::AuthenticationRequestNotFound) => unreachable!(),
     };

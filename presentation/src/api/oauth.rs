@@ -25,6 +25,10 @@ pub async fn callback_handler<L: Locator>(
         .await
     {
         Ok(invite_link) => invite_link,
+        Err(AuthenticationError::TemporaryUnavailable) => {
+            warn!("Authentication is temporarily unavailable");
+            return StatusCode::SERVICE_UNAVAILABLE.into_response();
+        }
         Err(AuthenticationError::Error(error)) => {
             warn!("Error during authentication: {:?}", error);
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();

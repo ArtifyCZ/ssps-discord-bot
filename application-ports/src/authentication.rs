@@ -23,4 +23,6 @@ pub enum AuthenticationError {
     Error(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
     #[error("User authentication request was not found")]
     AuthenticationRequestNotFound,
+    #[error("Service is temporarily unavailable")]
+    TemporaryUnavailable,
 }

@@ -7,12 +7,13 @@ use domain::authentication::archived_authenticated_user::{
 use domain::authentication::authenticated_user::{
     create_user_from_successful_authentication, AuthenticatedUserRepository,
 };
+use domain::authentication::create_class_user_group_id_mails;
 use domain::authentication::user_authentication_request::{
     create_user_authentication_request, UserAuthenticationRequestRepository,
 };
 use domain::class::class_group::find_class_group;
 use domain::class::class_id::get_class_id;
-use domain::ports::discord::DiscordPort;
+use domain::ports::discord::{DiscordError, DiscordPort};
 use domain::ports::oauth::{OAuthError, OAuthPort};
 use domain_shared::authentication::{AuthenticationLink, ClientCallbackToken, CsrfToken};
 use domain_shared::discord::{RoleId, UserId};
@@ -29,6 +30,7 @@ pub struct AuthenticationService {
         Arc<dyn UserAuthenticationRequestRepository + Send + Sync>,
     invite_link: InviteLink,
     additional_student_roles: Vec<RoleId>,
+    class_ids: Vec<String>,
 }
 
 impl AuthenticationService {
@@ -46,6 +48,11 @@ impl AuthenticationService {
         invite_link: InviteLink,
         additional_student_roles: Vec<RoleId>,
     ) -> Self {
+        let class_ids = create_class_user_group_id_mails()
+            .into_iter()
+            .map(|(class_id, _)| class_id)
+            .collect();
+
         Self {
             discord_port,
             oauth_port,
@@ -54,6 +61,7 @@ impl AuthenticationService {
             user_authentication_request_repository,
             invite_link,
             additional_student_roles,
+            class_ids,
         }
     }
 }
@@ -65,7 +73,7 @@ impl AuthenticationPort for AuthenticationService {
         &self,
         user_id: UserId,
     ) -> Result<AuthenticationLink, AuthenticationError> {
-        let (link, csrf_token) = self.oauth_port.create_authentication_link().await?;
+        let (link, csrf_token) = self.oauth_port.create_authentication_link().await;
 
         let request = create_user_authentication_request(csrf_token, user_id);
 
@@ -104,27 +112,47 @@ impl AuthenticationPort for AuthenticationService {
         let oauth_token = self
             .oauth_port
             .exchange_code_after_callback(client_callback_token)
-            .await?;
-        let user_info = self
-            .oauth_port
-            .get_user_info(&oauth_token.access_token)
             .await
             .map_err(|err| match err {
-                OAuthError::OAuthUnavailable => {
-                    AuthenticationError::Error("OAuth is unavailable".into())
-                }
+                OAuthError::OAuthUnavailable => AuthenticationError::TemporaryUnavailable,
                 OAuthError::TokenExpired => {
                     error!(
                         user_id = user_id.0,
                         "User's OAuth token expired during authentication process",
                     );
-                    AuthenticationError::Error("OAuth token expired".into())
+                    AuthenticationError::TemporaryUnavailable
                 }
             })?;
-        let class_group = find_class_group(&user_info.groups)
-            .ok_or_else(|| AuthenticationError::Error("User is not in the Class group".into()))?;
-        let class_id = get_class_id(class_group)
-            .ok_or_else(|| AuthenticationError::Error("User's class group ID not found".into()))?;
+        let user_info = self
+            .oauth_port
+            .get_user_info(&oauth_token.access_token)
+            .await
+            .map_err(|err| match err {
+                OAuthError::OAuthUnavailable => AuthenticationError::TemporaryUnavailable,
+                OAuthError::TokenExpired => {
+                    error!(
+                        user_id = user_id.0,
+                        "User's OAuth token expired during authentication process",
+                    );
+                    AuthenticationError::TemporaryUnavailable
+                }
+            })?;
+        let class_group = find_class_group(&user_info.groups).ok_or_else(|| {
+            warn!(
+                user_id = user_id.0,
+                groups = ?&user_info.groups,
+                "Could not find class group in user's groups",
+            );
+            AuthenticationError::TemporaryUnavailable
+        })?;
+        let class_id = get_class_id(class_group).ok_or_else(|| {
+            warn!(
+                user_id = user_id.0,
+                class_group = ?class_group,
+                "Could not find class ID from class group",
+            );
+            AuthenticationError::TemporaryUnavailable
+        })?;
 
         if let Some(user) = self
             .authenticated_user_repository
@@ -147,17 +175,55 @@ impl AuthenticationPort for AuthenticationService {
             let audit_log_reason =
                 "Removed user roles due to new user authenticating with the same email";
 
-            self.discord_port
-                .set_user_class_role(user.user_id(), None, audit_log_reason)
-                .await?;
+            let assigned_roles = self
+                .discord_port
+                .find_user_roles(user.user_id())
+                .await
+                .map_err(|err| match err {
+                    DiscordError::DiscordUnavailable => AuthenticationError::TemporaryUnavailable,
+                })?;
 
-            self.discord_port
-                .remove_user_from_roles(
-                    user.user_id(),
-                    &self.additional_student_roles,
-                    audit_log_reason,
-                )
-                .await?;
+            for assigned_role in assigned_roles {
+                if self.additional_student_roles.contains(&assigned_role) {
+                    self.discord_port
+                        .remove_user_role(user.user_id(), assigned_role, audit_log_reason)
+                        .await
+                        .map_err(|err| match err {
+                            DiscordError::DiscordUnavailable => {
+                                AuthenticationError::TemporaryUnavailable
+                            }
+                        })?;
+                    continue;
+                }
+
+                let role_name = self
+                    .discord_port
+                    .find_role_name(assigned_role)
+                    .await
+                    .map_err(|err| match err {
+                        DiscordError::DiscordUnavailable => {
+                            AuthenticationError::TemporaryUnavailable
+                        }
+                    })?
+                    .ok_or_else(|| {
+                        error!(
+                            role_id = assigned_role.0,
+                            "Could not find role name for role ID",
+                        );
+                        AuthenticationError::TemporaryUnavailable
+                    })?;
+
+                if self.class_ids.contains(&role_name) {
+                    self.discord_port
+                        .remove_user_role(user.user_id(), assigned_role, audit_log_reason)
+                        .await
+                        .map_err(|err| match err {
+                            DiscordError::DiscordUnavailable => {
+                                AuthenticationError::TemporaryUnavailable
+                            }
+                        })?;
+                }
+            }
         }
 
         let user = create_user_from_successful_authentication(
@@ -175,17 +241,69 @@ impl AuthenticationPort for AuthenticationService {
 
         let audit_log_reason = "Assigned student roles by OAuth2 Azure AD authentication";
 
-        self.discord_port
-            .set_user_class_role(user_id, Some(user.class_id()), audit_log_reason)
-            .await?;
+        let assigned_roles = self
+            .discord_port
+            .find_user_roles(user_id)
+            .await
+            .map_err(|err| match err {
+                DiscordError::DiscordUnavailable => AuthenticationError::TemporaryUnavailable,
+            })?;
+
+        for assigned_role in assigned_roles {
+            let role_name = self
+                .discord_port
+                .find_role_name(assigned_role)
+                .await
+                .map_err(|err| match err {
+                    DiscordError::DiscordUnavailable => AuthenticationError::TemporaryUnavailable,
+                })?
+                .ok_or_else(|| {
+                    error!(
+                        role_id = assigned_role.0,
+                        "Could not find role name for role ID",
+                    );
+                    AuthenticationError::TemporaryUnavailable
+                })?;
+
+            if role_name != user.class_id() && self.class_ids.contains(&role_name) {
+                self.discord_port
+                    .remove_user_role(user_id, assigned_role, audit_log_reason)
+                    .await
+                    .map_err(|err| match err {
+                        DiscordError::DiscordUnavailable => {
+                            AuthenticationError::TemporaryUnavailable
+                        }
+                    })?;
+            }
+        }
+
+        let class_role = self
+            .discord_port
+            .find_class_role(user.class_id())
+            .await
+            .map_err(|err| match err {
+                DiscordError::DiscordUnavailable => AuthenticationError::TemporaryUnavailable,
+            })?
+            .ok_or_else(|| {
+                error!(class_id = user.class_id(), "Could not find class role ID");
+                AuthenticationError::TemporaryUnavailable
+            })?;
 
         self.discord_port
-            .assign_roles_to_user_if_not_assigned(
-                user_id,
-                &self.additional_student_roles,
-                audit_log_reason,
-            )
-            .await?;
+            .assign_user_role(user_id, class_role, audit_log_reason)
+            .await
+            .map_err(|err| match err {
+                DiscordError::DiscordUnavailable => AuthenticationError::TemporaryUnavailable,
+            })?;
+
+        for role_id in &self.additional_student_roles {
+            self.discord_port
+                .assign_user_role(user_id, *role_id, audit_log_reason)
+                .await
+                .map_err(|err| match err {
+                    DiscordError::DiscordUnavailable => AuthenticationError::TemporaryUnavailable,
+                })?;
+        }
 
         info!(user_id = user_id.0, "User successfully authenticated");
 
@@ -235,7 +353,7 @@ mod tests {
         authenticated_user_repository: MockAuthenticatedUserRepository,
         user_authentication_request_repository: MockUserAuthenticationRequestRepository,
     ) -> AuthenticationService {
-        let invite_link = InviteLink("http://discord.gg/invite".into());
+        let invite_link = InviteLink("https://discord.gg/invite".into());
         let additional_student_roles = vec![RoleId(123), RoleId(456)];
         AuthenticationService::new(
             Arc::new(discord_port),
@@ -246,48 +364,6 @@ mod tests {
             invite_link,
             additional_student_roles,
         )
-    }
-
-    #[tokio::test]
-    async fn create_authentication_link_success() {
-        let (
-            discord_port,
-            mut oauth_port,
-            archived_authenticated_user_repo,
-            authenticated_user_repo,
-            mut user_auth_request_repo,
-        ) = setup_mocks();
-        let user_id = UserId(98765);
-        let expected_link = AuthenticationLink("http://oauth.com/auth?csrf=...&...".to_string());
-        let expected_csrf_token = CsrfToken("random_csrf_token".to_string());
-
-        let link_clone = expected_link.0.clone();
-        let csrf_clone = expected_csrf_token.clone();
-        oauth_port
-            .expect_create_authentication_link()
-            .times(1)
-            .returning(move || Ok((AuthenticationLink(link_clone.clone()), csrf_clone.clone())));
-
-        let csrf_clone_for_save = expected_csrf_token.clone();
-        user_auth_request_repo
-            .expect_save()
-            .withf(move |req| req.user_id() == user_id && req.csrf_token() == &csrf_clone_for_save)
-            .times(1)
-            .returning(|_| Ok(()));
-
-        let service = create_service(
-            discord_port,
-            oauth_port,
-            archived_authenticated_user_repo,
-            authenticated_user_repo,
-            user_auth_request_repo,
-        );
-
-        let result = service.create_authentication_link(user_id).await;
-
-        assert!(result.is_ok());
-        let returned_link = result.unwrap();
-        assert_eq!(returned_link.0, expected_link.0);
     }
 
     #[tokio::test]

@@ -12,11 +12,11 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[cfg_attr(feature = "mock", mockall::automock)]
 #[async_trait]
 pub trait OAuthPort {
-    async fn create_authentication_link(&self) -> Result<(AuthenticationLink, CsrfToken)>;
+    async fn create_authentication_link(&self) -> (AuthenticationLink, CsrfToken);
     async fn exchange_code_after_callback(
         &self,
         client_callback_token: ClientCallbackToken,
-    ) -> Result<OAuthToken>;
+    ) -> Result<OAuthToken, OAuthError>;
     async fn refresh_token(&self, oauth_token: &OAuthToken) -> Result<OAuthToken, OAuthError>;
     async fn get_user_info(&self, access_token: &AccessToken) -> Result<UserInfoDto, OAuthError>;
 }

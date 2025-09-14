@@ -29,6 +29,7 @@ pub async fn command<D: Sync + Locator>(ctx: Context<'_, D>) -> Result<(), Error
         .await
     {
         Ok(link) => link,
+        Err(AuthenticationError::TemporaryUnavailable) => todo!(),
         Err(AuthenticationError::Error(error)) => return Err(error),
         Err(AuthenticationError::AuthenticationRequestNotFound) => unreachable!(),
     };

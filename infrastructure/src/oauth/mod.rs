@@ -83,10 +83,8 @@ impl OAuthAdapter {
 
 #[async_trait]
 impl OAuthPort for OAuthAdapter {
-    #[instrument(level = "debug", err, skip(self))]
-    async fn create_authentication_link(
-        &self,
-    ) -> domain::ports::oauth::Result<(AuthenticationLink, CsrfToken)> {
+    #[instrument(level = "debug", skip(self))]
+    async fn create_authentication_link(&self) -> (AuthenticationLink, CsrfToken) {
         let (link, csrf_token) = self
             .oauth_client
             .authorize_url(oauth2::CsrfToken::new_random)
@@ -95,33 +93,51 @@ impl OAuthPort for OAuthAdapter {
             .add_scope(Scope::new("offline_access".to_string()))
             .url();
 
-        Ok((
+        (
             oauth_to_domain_authentication_link(link),
             oauth_to_domain_csrf_token(csrf_token),
-        ))
+        )
     }
 
-    #[instrument(level = "debug", err, skip(self, client_callback_token))]
+    #[instrument(level = "debug", skip(self, client_callback_token))]
     async fn exchange_code_after_callback(
         &self,
         client_callback_token: ClientCallbackToken,
-    ) -> domain::ports::oauth::Result<OAuthToken> {
+    ) -> domain::ports::oauth::Result<OAuthToken, OAuthError> {
         let token_result = self
             .oauth_client
             .exchange_code(AuthorizationCode::new(client_callback_token.0))
             .request_async(&self.http_client)
-            .await?;
+            .await
+            .map_err(|err| match err {
+                RequestTokenError::ServerResponse(_) => todo!(),
+                RequestTokenError::Request(err) => {
+                    warn!("OAuth request failed with error: {:?}", err);
+                    OAuthError::OAuthUnavailable
+                }
+                RequestTokenError::Parse(err, _) => {
+                    warn!("OAuth request failed to parse response: {:?}", err);
+                    OAuthError::OAuthUnavailable
+                }
+                RequestTokenError::Other(err) => {
+                    warn!("Request failed with error: {:?}", err);
+                    OAuthError::OAuthUnavailable
+                }
+            })?;
+
         let expires_at = Utc::now()
             + token_result
                 .expires_in()
                 .map(|d| d - Duration::from_secs(30))
                 .unwrap_or(Duration::from_secs(300));
+
         let access_token = token_result.access_token().secret().clone();
         let refresh_token = token_result
             .refresh_token()
             .expect("Refresh token should be present")
             .secret()
             .clone();
+
         Ok(OAuthToken {
             access_token: AccessToken(access_token),
             expires_at,
@@ -129,7 +145,7 @@ impl OAuthPort for OAuthAdapter {
         })
     }
 
-    #[instrument(level = "debug", err, skip(self, oauth_token))]
+    #[instrument(level = "debug", skip(self, oauth_token))]
     async fn refresh_token(
         &self,
         oauth_token: &OAuthToken,
