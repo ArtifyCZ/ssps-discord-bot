@@ -10,7 +10,7 @@ use crate::discord::create_message::domain_to_serenity_create_message;
 use crate::discord::role_id::{domain_to_serenity_role_id, serenity_to_domain_role_id};
 use crate::discord::user_id::domain_to_serenity_user_id;
 use async_trait::async_trait;
-use domain::ports::discord::{ChannelId, CreateMessage, DiscordPort};
+use domain::ports::discord::{ChannelId, CreateMessage, DiscordPort, Role};
 use domain::ports::discord::{DiscordError, Result};
 use domain_shared::discord::{RoleId, UserId};
 use poise::serenity_prelude as serenity;
@@ -107,7 +107,10 @@ impl DiscordPort for DiscordAdapter {
     }
 
     #[instrument(level = "debug", err, skip_all)]
-    async fn find_user_roles(&self, user_id: UserId) -> Result<Vec<RoleId>, DiscordError> {
+    async fn find_user_roles(
+        &self,
+        user_id: UserId,
+    ) -> Result<Vec<Role>, DiscordError> {
         let user_id = domain_to_serenity_user_id(user_id);
 
         let member = self
@@ -122,11 +125,26 @@ impl DiscordPort for DiscordAdapter {
                 DiscordError::DiscordUnavailable
             })?;
 
-        Ok(member
-            .roles
-            .into_iter()
-            .map(serenity_to_domain_role_id)
-            .collect())
+        let mut roles = Vec::new();
+        for role_id in member.roles.iter() {
+            let role = self
+                .client
+                .get_guild_role(self.guild_id, *role_id)
+                .await
+                .map_err(|err| {
+                    warn!(
+                        "Failed to fetch role {} from guild {}: {}",
+                        role_id, self.guild_id, err,
+                    );
+                    DiscordError::DiscordUnavailable
+                })?;
+            roles.push(Role {
+                role_id: serenity_to_domain_role_id(role.id),
+                name: role.name,
+            });
+        }
+
+        Ok(roles)
     }
 
     #[instrument(level = "debug", err, skip_all)]

@@ -184,9 +184,12 @@ impl AuthenticationPort for AuthenticationService {
                 })?;
 
             for assigned_role in assigned_roles {
-                if self.additional_student_roles.contains(&assigned_role) {
+                if self
+                    .additional_student_roles
+                    .contains(&assigned_role.role_id)
+                {
                     self.discord_port
-                        .remove_user_role(user.user_id(), assigned_role, audit_log_reason)
+                        .remove_user_role(user.user_id(), assigned_role.role_id, audit_log_reason)
                         .await
                         .map_err(|err| match err {
                             DiscordError::DiscordUnavailable => {
@@ -196,26 +199,13 @@ impl AuthenticationPort for AuthenticationService {
                     continue;
                 }
 
-                let role_name = self
-                    .discord_port
-                    .find_role_name(assigned_role)
-                    .await
-                    .map_err(|err| match err {
-                        DiscordError::DiscordUnavailable => {
-                            AuthenticationError::TemporaryUnavailable
-                        }
-                    })?
-                    .ok_or_else(|| {
-                        error!(
-                            role_id = assigned_role.0,
-                            "Could not find role name for role ID",
-                        );
-                        AuthenticationError::TemporaryUnavailable
-                    })?;
-
-                if self.class_ids.contains(&role_name) {
+                if self
+                    .class_ids
+                    .iter()
+                    .any(|class_id| class_id.eq_ignore_ascii_case(&assigned_role.name))
+                {
                     self.discord_port
-                        .remove_user_role(user.user_id(), assigned_role, audit_log_reason)
+                        .remove_user_role(user.user_id(), assigned_role.role_id, audit_log_reason)
                         .await
                         .map_err(|err| match err {
                             DiscordError::DiscordUnavailable => {
@@ -250,24 +240,14 @@ impl AuthenticationPort for AuthenticationService {
             })?;
 
         for assigned_role in assigned_roles {
-            let role_name = self
-                .discord_port
-                .find_role_name(assigned_role)
-                .await
-                .map_err(|err| match err {
-                    DiscordError::DiscordUnavailable => AuthenticationError::TemporaryUnavailable,
-                })?
-                .ok_or_else(|| {
-                    error!(
-                        role_id = assigned_role.0,
-                        "Could not find role name for role ID",
-                    );
-                    AuthenticationError::TemporaryUnavailable
-                })?;
-
-            if role_name != user.class_id() && self.class_ids.contains(&role_name) {
+            if !user.class_id().eq_ignore_ascii_case(&assigned_role.name)
+                && self
+                    .class_ids
+                    .iter()
+                    .any(|class_id| class_id.eq_ignore_ascii_case(&assigned_role.name))
+            {
                 self.discord_port
-                    .remove_user_role(user_id, assigned_role, audit_log_reason)
+                    .remove_user_role(user_id, assigned_role.role_id, audit_log_reason)
                     .await
                     .map_err(|err| match err {
                         DiscordError::DiscordUnavailable => {
