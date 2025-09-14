@@ -55,6 +55,7 @@ impl UserRoleService {
         }
     }
 
+    #[instrument(level = "debug", skip_all)]
     pub fn remove_user_roles(&self) -> RoleDiff {
         let mut to_remove = vec![];
 
