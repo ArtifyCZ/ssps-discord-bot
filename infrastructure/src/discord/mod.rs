@@ -108,6 +108,7 @@ impl DiscordPort for DiscordAdapter {
         })
     }
 
+    #[instrument(level = "debug", err, skip_all)]
     async fn apply_role_diff(
         &self,
         user_id: UserId,

@@ -32,6 +32,7 @@ impl UserRoleService {
         }
     }
 
+    #[instrument(level = "debug", skip_all)]
     pub fn assign_user_roles(&self, user: &AuthenticatedUser) -> RoleDiff {
         let mut to_assign = vec![];
         let mut to_remove = vec![];
