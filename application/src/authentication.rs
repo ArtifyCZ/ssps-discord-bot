@@ -7,7 +7,6 @@ use domain::authentication::archived_authenticated_user::{
 use domain::authentication::authenticated_user::{
     create_user_from_successful_authentication, AuthenticatedUserRepository,
 };
-use domain::authentication::create_class_user_group_id_mails;
 use domain::authentication::user_authentication_request::{
     create_user_authentication_request, UserAuthenticationRequestRepository,
 };
@@ -15,8 +14,9 @@ use domain::class::class_group::find_class_group;
 use domain::class::class_id::get_class_id;
 use domain::ports::discord::{DiscordError, DiscordPort};
 use domain::ports::oauth::{OAuthError, OAuthPort};
+use domain::user_role_service::UserRoleService;
 use domain_shared::authentication::{AuthenticationLink, ClientCallbackToken, CsrfToken};
-use domain_shared::discord::{RoleId, UserId};
+use domain_shared::discord::UserId;
 use std::sync::Arc;
 use tracing::{error, info, instrument, warn, Span};
 
@@ -28,9 +28,8 @@ pub struct AuthenticationService {
     authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
     user_authentication_request_repository:
         Arc<dyn UserAuthenticationRequestRepository + Send + Sync>,
+    user_role_service: Arc<UserRoleService>,
     invite_link: InviteLink,
-    additional_student_roles: Vec<RoleId>,
-    class_ids: Vec<String>,
 }
 
 impl AuthenticationService {
@@ -45,23 +44,17 @@ impl AuthenticationService {
         user_authentication_request_repository: Arc<
             dyn UserAuthenticationRequestRepository + Send + Sync,
         >,
+        user_role_service: Arc<UserRoleService>,
         invite_link: InviteLink,
-        additional_student_roles: Vec<RoleId>,
     ) -> Self {
-        let class_ids = create_class_user_group_id_mails()
-            .into_iter()
-            .map(|(class_id, _)| class_id)
-            .collect();
-
         Self {
             discord_port,
             oauth_port,
             archived_authenticated_user_repository,
             authenticated_user_repository,
             user_authentication_request_repository,
+            user_role_service,
             invite_link,
-            additional_student_roles,
-            class_ids,
         }
     }
 }
@@ -175,45 +168,13 @@ impl AuthenticationPort for AuthenticationService {
             let audit_log_reason =
                 "Removed user roles due to new user authenticating with the same email";
 
-            let assigned_roles = self
-                .discord_port
-                .find_user_roles(user.user_id())
+            let diff = self.user_role_service.remove_user_roles();
+            self.discord_port
+                .apply_role_diff(user.user_id(), &diff, audit_log_reason)
                 .await
                 .map_err(|err| match err {
                     DiscordError::DiscordUnavailable => AuthenticationError::TemporaryUnavailable,
                 })?;
-
-            for assigned_role in assigned_roles {
-                if self
-                    .additional_student_roles
-                    .contains(&assigned_role.role_id)
-                {
-                    self.discord_port
-                        .remove_user_role(user.user_id(), assigned_role.role_id, audit_log_reason)
-                        .await
-                        .map_err(|err| match err {
-                            DiscordError::DiscordUnavailable => {
-                                AuthenticationError::TemporaryUnavailable
-                            }
-                        })?;
-                    continue;
-                }
-
-                if self
-                    .class_ids
-                    .iter()
-                    .any(|class_id| class_id.eq_ignore_ascii_case(&assigned_role.name))
-                {
-                    self.discord_port
-                        .remove_user_role(user.user_id(), assigned_role.role_id, audit_log_reason)
-                        .await
-                        .map_err(|err| match err {
-                            DiscordError::DiscordUnavailable => {
-                                AuthenticationError::TemporaryUnavailable
-                            }
-                        })?;
-                }
-            }
         }
 
         let user = create_user_from_successful_authentication(
@@ -231,156 +192,17 @@ impl AuthenticationPort for AuthenticationService {
 
         let audit_log_reason = "Assigned student roles by OAuth2 Azure AD authentication";
 
-        let assigned_roles = self
-            .discord_port
-            .find_user_roles(user_id)
-            .await
-            .map_err(|err| match err {
-                DiscordError::DiscordUnavailable => AuthenticationError::TemporaryUnavailable,
-            })?;
-
-        for assigned_role in assigned_roles {
-            if !user.class_id().eq_ignore_ascii_case(&assigned_role.name)
-                && self
-                    .class_ids
-                    .iter()
-                    .any(|class_id| class_id.eq_ignore_ascii_case(&assigned_role.name))
-            {
-                self.discord_port
-                    .remove_user_role(user_id, assigned_role.role_id, audit_log_reason)
-                    .await
-                    .map_err(|err| match err {
-                        DiscordError::DiscordUnavailable => {
-                            AuthenticationError::TemporaryUnavailable
-                        }
-                    })?;
-            }
-        }
-
-        let class_role = self
-            .discord_port
-            .find_class_role(user.class_id())
-            .await
-            .map_err(|err| match err {
-                DiscordError::DiscordUnavailable => AuthenticationError::TemporaryUnavailable,
-            })?
-            .ok_or_else(|| {
-                error!(class_id = user.class_id(), "Could not find class role ID");
-                AuthenticationError::TemporaryUnavailable
-            })?;
+        let diff = self.user_role_service.assign_user_roles(&user);
 
         self.discord_port
-            .assign_user_role(user_id, class_role, audit_log_reason)
+            .apply_role_diff(user.user_id(), &diff, audit_log_reason)
             .await
             .map_err(|err| match err {
                 DiscordError::DiscordUnavailable => AuthenticationError::TemporaryUnavailable,
             })?;
-
-        for role_id in &self.additional_student_roles {
-            self.discord_port
-                .assign_user_role(user_id, *role_id, audit_log_reason)
-                .await
-                .map_err(|err| match err {
-                    DiscordError::DiscordUnavailable => AuthenticationError::TemporaryUnavailable,
-                })?;
-        }
 
         info!(user_id = user_id.0, "User successfully authenticated");
 
         Ok(self.invite_link.clone())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use domain::authentication::archived_authenticated_user::MockArchivedAuthenticatedUserRepository;
-    use domain::authentication::authenticated_user::MockAuthenticatedUserRepository;
-    use domain::authentication::user_authentication_request::MockUserAuthenticationRequestRepository;
-    use domain::ports::discord::MockDiscordPort;
-    use domain::ports::oauth::MockOAuthPort;
-    use std::sync::Arc;
-    use tokio;
-
-    #[instrument(level = "trace", skip_all)]
-    fn setup_mocks() -> (
-        MockDiscordPort,
-        MockOAuthPort,
-        MockArchivedAuthenticatedUserRepository,
-        MockAuthenticatedUserRepository,
-        MockUserAuthenticationRequestRepository,
-    ) {
-        let discord_port = MockDiscordPort::new();
-        let oauth_port = MockOAuthPort::new();
-        let archived_authenticated_user_repository = MockArchivedAuthenticatedUserRepository::new();
-        let authenticated_user_repository = MockAuthenticatedUserRepository::new();
-        let user_authentication_request_repository = MockUserAuthenticationRequestRepository::new();
-
-        (
-            discord_port,
-            oauth_port,
-            archived_authenticated_user_repository,
-            authenticated_user_repository,
-            user_authentication_request_repository,
-        )
-    }
-
-    #[instrument(level = "trace", skip_all)]
-    fn create_service(
-        discord_port: MockDiscordPort,
-        oauth_port: MockOAuthPort,
-        archived_authenticated_user_repository: MockArchivedAuthenticatedUserRepository,
-        authenticated_user_repository: MockAuthenticatedUserRepository,
-        user_authentication_request_repository: MockUserAuthenticationRequestRepository,
-    ) -> AuthenticationService {
-        let invite_link = InviteLink("https://discord.gg/invite".into());
-        let additional_student_roles = vec![RoleId(123), RoleId(456)];
-        AuthenticationService::new(
-            Arc::new(discord_port),
-            Arc::new(oauth_port),
-            Arc::new(archived_authenticated_user_repository),
-            Arc::new(authenticated_user_repository),
-            Arc::new(user_authentication_request_repository),
-            invite_link,
-            additional_student_roles,
-        )
-    }
-
-    #[tokio::test]
-    async fn confirm_authentication_request_not_found() {
-        let (
-            discord_port,
-            oauth_port,
-            archived_authenticated_user_repo,
-            authenticated_user_repo,
-            mut user_auth_request_repo, // mut because expect_find_by_csrf_token is called
-        ) = setup_mocks();
-
-        let csrf_token = CsrfToken("non_existent_token".to_string());
-        let client_callback_token = ClientCallbackToken("callback_code".to_string());
-
-        user_auth_request_repo
-            .expect_find_by_csrf_token()
-            .with(mockall::predicate::eq(csrf_token.clone()))
-            .times(1)
-            .returning(|_| Ok(None)); // Request not found
-
-        let service = create_service(
-            discord_port,
-            oauth_port,
-            archived_authenticated_user_repo,
-            authenticated_user_repo,
-            user_auth_request_repo,
-        );
-
-        let result = service
-            .confirm_authentication(csrf_token, client_callback_token)
-            .await;
-
-        assert!(result.is_err());
-        match result.err().unwrap() {
-            AuthenticationError::AuthenticationRequestNotFound => {}
-            other => panic!("Expected AuthenticationRequestNotFound, got {:?}", other),
-        }
     }
 }

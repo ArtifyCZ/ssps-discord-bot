@@ -3,6 +3,7 @@ mod create_attachment;
 mod create_button;
 mod create_message;
 mod role;
+mod role_diff;
 
 use async_trait::async_trait;
 pub use create_action_row::CreateActionRow;
@@ -12,6 +13,7 @@ pub use create_message::CreateMessage;
 pub use domain_shared::discord::ChannelId;
 use domain_shared::discord::{RoleId, UserId};
 pub use role::Role;
+pub use role_diff::RoleDiff;
 use thiserror::Error;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -24,17 +26,16 @@ pub trait DiscordPort {
 
     async fn purge_messages(&self, channel_id: ChannelId) -> Result<()>;
 
-    async fn assign_user_role(
+    async fn find_or_create_role_by_name(
         &self,
-        user_id: UserId,
-        role_id: RoleId,
+        role_name: &str,
         reason: &str,
-    ) -> Result<(), DiscordError>;
+    ) -> Result<Role, DiscordError>;
 
-    async fn remove_user_role(
+    async fn apply_role_diff(
         &self,
         user_id: UserId,
-        role_id: RoleId,
+        role_diff: &RoleDiff,
         reason: &str,
     ) -> Result<(), DiscordError>;
 

@@ -100,14 +100,22 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         PostgresUserAuthenticationRequestRepository::new(database_connection.clone()),
     );
 
+    let user_role_service = Arc::new(
+        domain::user_role_service::UserRoleService::new(
+            discord_adapter.clone(),
+            additional_student_roles.clone(),
+        )
+        .await,
+    );
+
     let authentication_adapter = Arc::new(AuthenticationService::new(
         discord_adapter.clone(),
         oauth_adapter.clone(),
         archived_authenticated_user_repository.clone(),
         authenticated_user_repository.clone(),
         user_authentication_request_repository,
+        user_role_service.clone(),
         invite_link,
-        additional_student_roles.clone(),
     ));
     let information_channel_adapter =
         Arc::new(InformationChannelService::new(discord_adapter.clone()));
@@ -115,6 +123,7 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         discord_adapter,
         oauth_adapter,
         authenticated_user_repository,
+        user_role_service,
     ));
 
     let locator = locator::ApplicationPortLocator::new(

@@ -18,3 +18,11 @@ pub fn create_class_user_group_id_mails() -> Vec<(String, String)> {
     }
     user_group_mails
 }
+
+#[instrument(level = "trace")]
+pub fn create_class_ids() -> Vec<String> {
+    create_class_user_group_id_mails()
+        .into_iter()
+        .map(|(id, _)| id)
+        .collect()
+}

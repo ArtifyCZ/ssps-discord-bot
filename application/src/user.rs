@@ -6,6 +6,7 @@ use domain::class::class_group::find_class_group;
 use domain::class::class_id::get_class_id;
 use domain::ports::discord::{DiscordError, DiscordPort};
 use domain::ports::oauth::{OAuthError, OAuthPort};
+use domain::user_role_service::UserRoleService;
 use domain_shared::discord::UserId;
 use std::sync::Arc;
 use tracing::{error, info, instrument, warn};
@@ -14,6 +15,7 @@ pub struct UserService {
     discord_port: Arc<dyn DiscordPort + Send + Sync>,
     oauth_port: Arc<dyn OAuthPort + Send + Sync>,
     authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
+    user_role_service: Arc<UserRoleService>,
 }
 
 impl UserService {
@@ -22,11 +24,13 @@ impl UserService {
         discord_port: Arc<dyn DiscordPort + Send + Sync>,
         oauth_port: Arc<dyn OAuthPort + Send + Sync>,
         authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
+        user_role_service: Arc<UserRoleService>,
     ) -> Self {
         Self {
             discord_port,
             oauth_port,
             authenticated_user_repository,
+            user_role_service,
         }
     }
 }
@@ -156,23 +160,9 @@ impl UserPort for UserService {
 
         let audit_log_reason = "Assigned student roles by OAuth2 Azure AD authentication";
 
-        let class_role_id = self
-            .discord_port
-            .find_class_role(user.class_id())
-            .await
-            .map_err(|err| match err {
-                DiscordError::DiscordUnavailable => UserError::TemporaryUnavailable,
-            })?
-            .ok_or_else(|| {
-                error!(
-                    class_id = user.class_id(),
-                    "Could not find class role ID for class ID",
-                );
-                UserError::TemporaryUnavailable
-            })?;
-
+        let diff = self.user_role_service.assign_user_roles(&user);
         self.discord_port
-            .assign_user_role(user.user_id(), class_role_id, audit_log_reason)
+            .apply_role_diff(user.user_id(), &diff, audit_log_reason)
             .await
             .map_err(|err| match err {
                 DiscordError::DiscordUnavailable => UserError::TemporaryUnavailable,

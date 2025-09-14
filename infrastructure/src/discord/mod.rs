@@ -10,13 +10,14 @@ use crate::discord::create_message::domain_to_serenity_create_message;
 use crate::discord::role_id::{domain_to_serenity_role_id, serenity_to_domain_role_id};
 use crate::discord::user_id::domain_to_serenity_user_id;
 use async_trait::async_trait;
-use domain::ports::discord::{ChannelId, CreateMessage, DiscordPort, Role};
+use domain::ports::discord::{ChannelId, CreateMessage, DiscordPort, Role, RoleDiff};
 use domain::ports::discord::{DiscordError, Result};
 use domain_shared::discord::{RoleId, UserId};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::GuildId;
 use serenity::all::{Builder, Http};
 use serenity::futures::StreamExt;
+use std::ops::Not;
 use std::sync::Arc;
 use tracing::{instrument, warn};
 
@@ -58,59 +59,111 @@ impl DiscordPort for DiscordAdapter {
         Ok(())
     }
 
-    #[instrument(level = "debug", skip_all)]
-    async fn assign_user_role(
+    #[instrument(level = "debug", err, skip_all)]
+    async fn find_or_create_role_by_name(
         &self,
-        user_id: UserId,
-        role_id: RoleId,
+        role_name: &str,
         reason: &str,
-    ) -> Result<(), DiscordError> {
-        let user_id = domain_to_serenity_user_id(user_id);
-        let role_id = domain_to_serenity_role_id(role_id);
-
-        self.client
-            .add_member_role(self.guild_id, user_id, role_id, Some(reason))
+    ) -> Result<Role, DiscordError> {
+        let roles = self
+            .client
+            .get_guild_roles(self.guild_id)
             .await
             .map_err(|err| {
                 warn!(
-                    "Failed to assign role {} to user {}: {}",
-                    role_id, user_id, err,
+                    "Failed to fetch roles from guild {}: {}",
+                    self.guild_id, err,
                 );
                 DiscordError::DiscordUnavailable
             })?;
 
-        Ok(())
-    }
+        for role in roles {
+            if role.name.eq_ignore_ascii_case(role_name) {
+                return Ok(Role {
+                    role_id: serenity_to_domain_role_id(role.id),
+                    name: role.name,
+                });
+            }
+        }
 
-    #[instrument(level = "debug", err, skip_all)]
-    async fn remove_user_role(
-        &self,
-        user_id: UserId,
-        role_id: RoleId,
-        reason: &str,
-    ) -> Result<(), DiscordError> {
-        let user_id = domain_to_serenity_user_id(user_id);
-        let role_id = domain_to_serenity_role_id(role_id);
-
-        self.client
-            .remove_member_role(self.guild_id, user_id, role_id, Some(reason))
+        let role = self
+            .client
+            .create_role(
+                self.guild_id,
+                &serenity::EditRole::new()
+                    .name(role_name)
+                    .hoist(false)
+                    .mentionable(false),
+                Some(reason),
+            )
             .await
             .map_err(|err| {
-                warn!(
-                    "Failed to remove role {} from user {}: {}",
-                    role_id, user_id, err,
-                );
+                warn!("Failed to create role {}: {}", role_name, err);
                 DiscordError::DiscordUnavailable
             })?;
 
-        Ok(())
+        Ok(Role {
+            role_id: serenity_to_domain_role_id(role.id),
+            name: role.name,
+        })
+    }
+
+    async fn apply_role_diff(
+        &self,
+        user_id: UserId,
+        role_diff: &RoleDiff,
+        reason: &str,
+    ) -> Result<(), DiscordError> {
+        let user_id = domain_to_serenity_user_id(user_id);
+        let mut failed = false;
+
+        for role_id in &role_diff.to_assign {
+            let role_id = domain_to_serenity_role_id(*role_id);
+
+            match self
+                .client
+                .add_member_role(self.guild_id, user_id, role_id, Some(reason))
+                .await
+            {
+                Ok(()) => {}
+                Err(err) => {
+                    warn!(
+                        "Failed to assign role {} to user {}: {}",
+                        role_id, user_id, err
+                    );
+                    failed = true;
+                }
+            }
+        }
+
+        for role_id in &role_diff.to_remove {
+            let role_id = domain_to_serenity_role_id(*role_id);
+
+            match self
+                .client
+                .remove_member_role(self.guild_id, user_id, role_id, Some(reason))
+                .await
+            {
+                Ok(()) => {}
+                Err(err) => {
+                    warn!(
+                        "Failed to remove role {} from user {}: {}",
+                        role_id, user_id, err
+                    );
+                    failed = true;
+                }
+            }
+        }
+
+        if failed.not() {
+            Ok(())
+        } else {
+            Err(DiscordError::DiscordUnavailable)
+        }
     }
 
     #[instrument(level = "debug", err, skip_all)]
-    async fn find_user_roles(
-        &self,
-        user_id: UserId,
-    ) -> Result<Vec<Role>, DiscordError> {
+    async fn find_user_roles(&self, user_id: UserId) -> Result<Vec<Role>, DiscordError> {
         let user_id = domain_to_serenity_user_id(user_id);
 
         let member = self
