@@ -27,9 +27,10 @@ pub async fn command<D: Sync + Locator>(
     );
 
     let user_id = UserId(target.id.get());
+    let force_refresh = force_refresh.unwrap_or(false);
 
-    if force_refresh.unwrap_or(false) {
-        ctx.defer().await?;
+    if force_refresh {
+        ctx.defer_ephemeral().await?;
         user_port.refresh_user_data(user_id).await?;
     }
 
@@ -74,6 +75,7 @@ pub async fn command<D: Sync + Locator>(
                 ("User ID", target.id.to_string(), false),
             ]),
     };
+
     let reply = CreateReply::default()
         .reply(true)
         .ephemeral(true)

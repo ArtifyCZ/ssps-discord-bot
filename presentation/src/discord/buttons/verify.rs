@@ -3,7 +3,7 @@ use crate::discord::{response, Error};
 use application_ports::authentication::AuthenticationError;
 use domain_shared::discord::UserId;
 use poise::serenity_prelude as serenity;
-use poise::serenity_prelude::{CacheHttp, CreateInteractionResponse};
+use poise::serenity_prelude::CacheHttp;
 use tracing::{error, info, instrument};
 
 pub const BUTTON_ID: &str = domain::information_channel::VERIFY_ME_BUTTON_ID;
@@ -21,7 +21,7 @@ pub async fn handle_button_click<L: Locator>(
     );
 
     let authentication_port = locator.get_authentication_port();
-    interaction.defer(ctx.http()).await?;
+    interaction.defer_ephemeral(ctx.http()).await?;
 
     let response = match authentication_port
         .create_authentication_link(UserId(interaction.user.id.get()))
@@ -38,12 +38,9 @@ pub async fn handle_button_click<L: Locator>(
     };
 
     interaction
-        .create_response(
+        .edit_response(
             ctx,
-            CreateInteractionResponse::Message(
-                response
-                    .to_slash_initial_response(serenity::CreateInteractionResponseMessage::new()),
-            ),
+            response.to_slash_initial_response_edit(serenity::EditInteractionResponse::new()),
         )
         .await?;
 
