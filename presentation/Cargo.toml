@@ -7,6 +7,7 @@ application-ports = { path = "../application-ports" }
 domain = { path = "../domain" }
 domain-shared = { path = "../domain-shared" }
 
+anyhow = "1.0"
 axum = { version = "0.8", features = ["json", "tokio", "tracing", "macros"] }
 poise = "0.6"
 serde = { version = "1.0", features = ["derive"] }

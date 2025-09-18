@@ -2364,6 +2364,7 @@ dependencies = [
 name = "presentation"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "application-ports",
  "axum",
  "domain",

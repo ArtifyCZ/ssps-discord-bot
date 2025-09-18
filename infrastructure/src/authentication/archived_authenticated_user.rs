@@ -1,16 +1,12 @@
 use async_trait::async_trait;
 use domain::authentication::archived_authenticated_user::{
     ArchivedAuthenticatedUser, ArchivedAuthenticatedUserRepository,
-    ArchivedAuthenticatedUserSnapshot,
+    ArchivedAuthenticatedUserRepositoryError, ArchivedAuthenticatedUserSnapshot,
 };
 use domain::ports::oauth::OAuthToken;
 use domain_shared::authentication::ArchivedUserId;
 use sqlx::{query, PgPool};
-use tracing::instrument;
-
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-pub type Result<T> = std::result::Result<T, Error>;
+use tracing::{instrument, warn};
 
 pub struct PostgresArchivedAuthenticatedUserRepository {
     pool: PgPool,
@@ -26,7 +22,10 @@ impl PostgresArchivedAuthenticatedUserRepository {
 #[async_trait]
 impl ArchivedAuthenticatedUserRepository for PostgresArchivedAuthenticatedUserRepository {
     #[instrument(level = "debug", err, skip(self, user))]
-    async fn save(&self, user: &ArchivedAuthenticatedUser) -> Result<()> {
+    async fn save(
+        &self,
+        user: &ArchivedAuthenticatedUser,
+    ) -> Result<(), ArchivedAuthenticatedUserRepositoryError> {
         let ArchivedAuthenticatedUserSnapshot {
             archived_user_id: ArchivedUserId(user_id, archived_at),
             name,
@@ -52,8 +51,14 @@ impl ArchivedAuthenticatedUserRepository for PostgresArchivedAuthenticatedUserRe
             refresh_token.0,
             class_id,
             authenticated_at.naive_utc(),
-        ).execute(&self.pool).await?;
+        ).execute(&self.pool).await.map_err(map_err)?;
 
         Ok(())
     }
+}
+
+#[instrument(level = "trace", skip_all)]
+fn map_err(err: sqlx::Error) -> ArchivedAuthenticatedUserRepositoryError {
+    warn!(error = ?err, "Failed to save archived authenticated user");
+    ArchivedAuthenticatedUserRepositoryError::ServiceUnavailable
 }

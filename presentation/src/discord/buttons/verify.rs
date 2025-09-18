@@ -29,13 +29,6 @@ pub async fn handle_button_click<L: Locator>(
     {
         Ok(link) => response::authentication_link(link, &interaction.user),
         Err(AuthenticationError::TemporaryUnavailable) => response::temporary_unavailable(),
-        Err(AuthenticationError::Error(error)) => {
-            error!(
-                error = ?error,
-                "An unknown error occurred while creating authentication link",
-            );
-            response::temporary_unavailable()
-        }
         Err(AuthenticationError::AuthenticationRequestNotFound) => {
             error!(
                 "Unreachable: Got authentication request not found error when creating an authentication request",

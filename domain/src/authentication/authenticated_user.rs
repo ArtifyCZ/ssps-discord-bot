@@ -6,10 +6,6 @@ use domain_shared::discord::UserId;
 use thiserror::Error;
 use tracing::instrument;
 
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-pub type Result<T, E = Error> = std::result::Result<T, E>;
-
 #[derive(Debug)]
 pub struct AuthenticatedUser {
     user_id: UserId,
@@ -127,13 +123,16 @@ pub struct AuthenticatedUserSnapshot {
 #[async_trait]
 pub trait AuthenticatedUserRepository {
     async fn save(&self, user: &AuthenticatedUser) -> Result<(), AuthenticatedUserRepositoryError>;
-    async fn remove(&self, user_id: UserId) -> Result<()>;
-    async fn find_all(&self) -> Result<Vec<AuthenticatedUser>>;
+    async fn remove(&self, user_id: UserId) -> Result<(), AuthenticatedUserRepositoryError>;
+    async fn find_all(&self) -> Result<Vec<AuthenticatedUser>, AuthenticatedUserRepositoryError>;
     async fn find_by_user_id(
         &self,
         user_id: UserId,
     ) -> Result<Option<AuthenticatedUser>, AuthenticatedUserRepositoryError>;
-    async fn find_by_email(&self, email: &str) -> Result<Option<AuthenticatedUser>>;
+    async fn find_by_email(
+        &self,
+        email: &str,
+    ) -> Result<Option<AuthenticatedUser>, AuthenticatedUserRepositoryError>;
 }
 
 #[derive(Debug, Error)]

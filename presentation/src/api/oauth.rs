@@ -29,13 +29,13 @@ pub async fn callback_handler<L: Locator>(
             warn!("Authentication is temporarily unavailable");
             return StatusCode::SERVICE_UNAVAILABLE.into_response();
         }
-        Err(AuthenticationError::Error(error)) => {
-            warn!("Error during authentication: {:?}", error);
-            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-        }
         Err(AuthenticationError::AuthenticationRequestNotFound) => {
             warn!("Authentication request not found");
-            return Redirect::to("/").into_response();
+            return (
+                StatusCode::NOT_FOUND,
+                "Authentication request not found, the request may have been fulfilled already",
+            )
+                .into_response();
         }
     };
 

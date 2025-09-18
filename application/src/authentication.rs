@@ -3,6 +3,7 @@ use application_ports::discord::InviteLink;
 use async_trait::async_trait;
 use domain::authentication::archived_authenticated_user::{
     create_archived_authenticated_user_from_user, ArchivedAuthenticatedUserRepository,
+    ArchivedAuthenticatedUserRepositoryError,
 };
 use domain::authentication::authenticated_user::{
     create_user_from_successful_authentication, AuthenticatedUserRepository,
@@ -10,6 +11,7 @@ use domain::authentication::authenticated_user::{
 };
 use domain::authentication::user_authentication_request::{
     create_user_authentication_request, UserAuthenticationRequestRepository,
+    UserAuthenticationRequestRepositoryError,
 };
 use domain::class::class_group::find_class_group;
 use domain::class::class_id::get_class_id;
@@ -71,7 +73,8 @@ impl AuthenticationPort for AuthenticationService {
 
         self.user_authentication_request_repository
             .save(&request)
-            .await?;
+            .await
+            .map_err(map_auth_req_repo_err)?;
 
         info!(user_id = user_id.0, "Authentication link created");
 
@@ -87,7 +90,8 @@ impl AuthenticationPort for AuthenticationService {
         let request = match self
             .user_authentication_request_repository
             .find_by_csrf_token(&csrf_token)
-            .await?
+            .await
+            .map_err(map_auth_req_repo_err)?
         {
             Some(request) => request,
             None => {
@@ -149,7 +153,8 @@ impl AuthenticationPort for AuthenticationService {
         if let Some(user) = self
             .authenticated_user_repository
             .find_by_email(&user_info.email)
-            .await?
+            .await
+            .map_err(map_user_repo_err)?
         {
             warn!(
                 user_id = user_id.0,
@@ -159,10 +164,12 @@ impl AuthenticationPort for AuthenticationService {
             let archived_user = create_archived_authenticated_user_from_user(&user);
             self.archived_authenticated_user_repository
                 .save(&archived_user)
-                .await?;
+                .await
+                .map_err(map_archived_user_repo_err)?;
             self.authenticated_user_repository
                 .remove(user.user_id())
-                .await?;
+                .await
+                .map_err(map_user_repo_err)?;
 
             info!(
                 user_id = user.user_id().0,
@@ -191,7 +198,8 @@ impl AuthenticationPort for AuthenticationService {
             .map_err(map_user_repo_err)?;
         self.user_authentication_request_repository
             .remove_by_csrf_token(request.csrf_token())
-            .await?;
+            .await
+            .map_err(map_auth_req_repo_err)?;
 
         info!(
             user_id = user.user_id().0,
@@ -214,6 +222,26 @@ impl AuthenticationPort for AuthenticationService {
 fn map_user_repo_err(err: AuthenticatedUserRepositoryError) -> AuthenticationError {
     match err {
         AuthenticatedUserRepositoryError::ServiceUnavailable => {
+            AuthenticationError::TemporaryUnavailable
+        }
+    }
+}
+
+#[instrument(level = "trace", skip_all)]
+fn map_archived_user_repo_err(
+    err: ArchivedAuthenticatedUserRepositoryError,
+) -> AuthenticationError {
+    match err {
+        ArchivedAuthenticatedUserRepositoryError::ServiceUnavailable => {
+            AuthenticationError::TemporaryUnavailable
+        }
+    }
+}
+
+#[instrument(level = "trace", skip_all)]
+fn map_auth_req_repo_err(err: UserAuthenticationRequestRepositoryError) -> AuthenticationError {
+    match err {
+        UserAuthenticationRequestRepositoryError::TemporaryUnavailable => {
             AuthenticationError::TemporaryUnavailable
         }
     }

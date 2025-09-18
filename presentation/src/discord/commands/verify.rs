@@ -28,13 +28,6 @@ pub async fn command<D: Sync + Locator>(ctx: Context<'_, D>) -> Result<(), Error
     {
         Ok(link) => response::authentication_link(link, user),
         Err(AuthenticationError::TemporaryUnavailable) => response::temporary_unavailable(),
-        Err(AuthenticationError::Error(error)) => {
-            error!(
-                error = ?error,
-                "An unknown error occurred while creating authentication link",
-            );
-            response::temporary_unavailable()
-        }
         Err(AuthenticationError::AuthenticationRequestNotFound) => {
             error!(
                 "Unreachable: Got authentication request not found error when creating an authentication request",

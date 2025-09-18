@@ -4,11 +4,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use domain_shared::authentication::ArchivedUserId;
 use domain_shared::discord::UserId;
+use thiserror::Error;
 use tracing::instrument;
-
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct ArchivedAuthenticatedUser {
     archived_user_id: ArchivedUserId,
@@ -124,5 +121,14 @@ pub struct ArchivedAuthenticatedUserSnapshot {
 #[cfg_attr(feature = "mock", mockall::automock)]
 #[async_trait]
 pub trait ArchivedAuthenticatedUserRepository {
-    async fn save(&self, user: &ArchivedAuthenticatedUser) -> Result<()>;
+    async fn save(
+        &self,
+        user: &ArchivedAuthenticatedUser,
+    ) -> Result<(), ArchivedAuthenticatedUserRepositoryError>;
+}
+
+#[derive(Debug, Error)]
+pub enum ArchivedAuthenticatedUserRepositoryError {
+    #[error("Service is temporarily unavailable")]
+    ServiceUnavailable,
 }

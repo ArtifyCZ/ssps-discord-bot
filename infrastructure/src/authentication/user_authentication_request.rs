@@ -1,16 +1,11 @@
 use async_trait::async_trait;
 use domain::authentication::user_authentication_request::{
     UserAuthenticationRequest, UserAuthenticationRequestRepository,
-    UserAuthenticationRequestSnapshot,
+    UserAuthenticationRequestRepositoryError, UserAuthenticationRequestSnapshot,
 };
 use domain_shared::authentication::CsrfToken;
 use sqlx::{query, PgPool};
-use tracing::instrument;
-
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-pub type Result<T> =
-    std::result::Result<T, domain::authentication::user_authentication_request::Error>;
+use tracing::{instrument, warn};
 
 pub struct PostgresUserAuthenticationRequestRepository {
     pool: PgPool,
@@ -26,37 +21,23 @@ impl PostgresUserAuthenticationRequestRepository {
 #[async_trait]
 impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRepository {
     #[instrument(level = "debug", err, skip(self, request))]
-    async fn save(&self, request: &UserAuthenticationRequest) -> Result<()> {
+    async fn save(
+        &self,
+        request: &UserAuthenticationRequest,
+    ) -> Result<(), UserAuthenticationRequestRepositoryError> {
         let UserAuthenticationRequestSnapshot {
             csrf_token,
             user_id,
             requested_at,
         } = request.to_snapshot();
 
-        // Check if the request already exists
-        let exists = query!(
-            "SELECT EXISTS(SELECT 1 FROM user_authentication_requests WHERE csrf_token = $1)",
+        query!(
+            "INSERT INTO user_authentication_requests (csrf_token, user_id, requested_at) VALUES ($1, $2, $3)
+            ON CONFLICT (csrf_token) DO UPDATE SET user_id = $2, requested_at = $3",
             csrf_token.0,
-        )
-        .fetch_one(&self.pool)
-        .await?
-        .exists;
-
-        if let Some(true) = exists {
-            query!(
-                "UPDATE user_authentication_requests SET user_id = $1, requested_at = $2 WHERE csrf_token = $3",
-                user_id.0 as i64,
-                requested_at.naive_utc(),
-                csrf_token.0,
-            ).execute(&self.pool).await?;
-        } else {
-            query!(
-                "INSERT INTO user_authentication_requests (csrf_token, user_id, requested_at) VALUES ($1, $2, $3)",
-                csrf_token.0,
-                user_id.0 as i64,
-                requested_at.naive_utc(),
-            ).execute(&self.pool).await?;
-        }
+            user_id.0 as i64,
+            requested_at.naive_utc(),
+        ).execute(&self.pool).await.map_err(map_err)?;
 
         Ok(())
     }
@@ -65,15 +46,13 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
     async fn find_by_csrf_token(
         &self,
         csrf_token: &CsrfToken,
-    ) -> domain::authentication::user_authentication_request::Result<
-        Option<UserAuthenticationRequest>,
-    > {
+    ) -> Result<Option<UserAuthenticationRequest>, UserAuthenticationRequestRepositoryError> {
         let row = query!(
             "SELECT csrf_token, user_id, requested_at FROM user_authentication_requests WHERE csrf_token = $1",
             csrf_token.0,
         )
         .fetch_optional(&self.pool)
-        .await?;
+        .await.map_err(map_err)?;
 
         if let Some(row) = row {
             Ok(Some(UserAuthenticationRequest::from_snapshot(
@@ -92,14 +71,24 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
     async fn remove_by_csrf_token(
         &self,
         csrf_token: &CsrfToken,
-    ) -> domain::authentication::user_authentication_request::Result<()> {
+    ) -> Result<(), UserAuthenticationRequestRepositoryError> {
         query!(
             "DELETE FROM user_authentication_requests WHERE csrf_token = $1",
             csrf_token.0,
         )
         .execute(&self.pool)
-        .await?;
+        .await
+        .map_err(map_err)?;
 
         Ok(())
     }
+}
+
+#[instrument(level = "trace", skip_all)]
+fn map_err(err: sqlx::Error) -> UserAuthenticationRequestRepositoryError {
+    warn!(
+        error = ?err,
+        "Failed to fetch authenticated user",
+    );
+    UserAuthenticationRequestRepositoryError::TemporaryUnavailable
 }

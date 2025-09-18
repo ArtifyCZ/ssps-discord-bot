@@ -2,11 +2,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use domain_shared::authentication::CsrfToken;
 use domain_shared::discord::UserId;
+use thiserror::Error;
 use tracing::instrument;
-
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct UserAuthenticationRequest {
     csrf_token: CsrfToken,
@@ -73,10 +70,22 @@ pub struct UserAuthenticationRequestSnapshot {
 #[cfg_attr(feature = "mock", mockall::automock)]
 #[async_trait]
 pub trait UserAuthenticationRequestRepository {
-    async fn save(&self, request: &UserAuthenticationRequest) -> Result<()>;
+    async fn save(
+        &self,
+        request: &UserAuthenticationRequest,
+    ) -> Result<(), UserAuthenticationRequestRepositoryError>;
     async fn find_by_csrf_token(
         &self,
         csrf_token: &CsrfToken,
-    ) -> Result<Option<UserAuthenticationRequest>>;
-    async fn remove_by_csrf_token(&self, csrf_token: &CsrfToken) -> Result<()>;
+    ) -> Result<Option<UserAuthenticationRequest>, UserAuthenticationRequestRepositoryError>;
+    async fn remove_by_csrf_token(
+        &self,
+        csrf_token: &CsrfToken,
+    ) -> Result<(), UserAuthenticationRequestRepositoryError>;
+}
+
+#[derive(Debug, Error)]
+pub enum UserAuthenticationRequestRepositoryError {
+    #[error("Service is temporarily unavailable")]
+    TemporaryUnavailable,
 }

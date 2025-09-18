@@ -9,10 +9,6 @@ use domain_shared::discord::UserId;
 use sqlx::{query, PgPool};
 use tracing::{instrument, warn};
 
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-pub type Result<T, E = Error> = std::result::Result<T, E>;
-
 pub struct PostgresAuthenticatedUserRepository {
     pool: PgPool,
 }
@@ -79,22 +75,23 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
     }
 
     #[instrument(level = "debug", err, skip(self))]
-    async fn remove(&self, user_id: UserId) -> Result<()> {
+    async fn remove(&self, user_id: UserId) -> Result<(), AuthenticatedUserRepositoryError> {
         query!(
             "DELETE FROM authenticated_users WHERE user_id = $1",
             user_id.0 as i64,
         )
         .execute(&self.pool)
-        .await?;
+        .await
+        .map_err(map_err)?;
 
         Ok(())
     }
 
     #[instrument(level = "debug", err, skip(self))]
-    async fn find_all(&self) -> Result<Vec<AuthenticatedUser>> {
+    async fn find_all(&self) -> Result<Vec<AuthenticatedUser>, AuthenticatedUserRepositoryError> {
         let rows = query!(
             "SELECT user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at FROM authenticated_users",
-        ).fetch_all(&self.pool).await?;
+        ).fetch_all(&self.pool).await.map_err(map_err)?;
         let users = rows.into_iter().map(|row| record_to_user!(row)).collect();
         Ok(users)
     }
@@ -117,11 +114,14 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
     }
 
     #[instrument(level = "debug", err, skip(self, email))]
-    async fn find_by_email(&self, email: &str) -> Result<Option<AuthenticatedUser>> {
+    async fn find_by_email(
+        &self,
+        email: &str,
+    ) -> Result<Option<AuthenticatedUser>, AuthenticatedUserRepositoryError> {
         let row = query!(
             "SELECT user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at FROM authenticated_users WHERE email = $1",
             email,
-        ).fetch_optional(&self.pool).await?;
+        ).fetch_optional(&self.pool).await.map_err(map_err)?;
 
         if let Some(row) = row {
             Ok(Some(record_to_user!(row)))
