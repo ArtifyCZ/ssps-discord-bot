@@ -2,7 +2,7 @@ use crate::locator;
 use anyhow::anyhow;
 use clap::Args;
 use domain_shared::discord::{InviteLink, RoleId};
-use infrastructure::oauth::{OAuthAdapter, TenantId};
+use infrastructure::oauth::{OAuthAdapter, OAuthAdapterConfig, TenantId};
 use oauth2::{ClientId, ClientSecret};
 use presentation::api::run_api;
 use presentation::discord::run_bot;
@@ -13,12 +13,15 @@ use url::Url;
 use crate::args::CommonArgs;
 use application::authentication::AuthenticationService;
 use application::information_channel::InformationChannelService;
+use application::role_sync_job_handler::RoleSyncJobHandler;
 use application::user::UserService;
 use infrastructure::authentication::archived_authenticated_user::PostgresArchivedAuthenticatedUserRepository;
 use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUserRepository;
 use infrastructure::authentication::user_authentication_request::PostgresUserAuthenticationRequestRepository;
 use infrastructure::discord::DiscordAdapter;
+use infrastructure::jobs::role_sync_job_repository::PostgresRoleSyncRequestedRepository;
 use poise::serenity_prelude as serenity;
+use presentation::worker::run_worker;
 use tracing::{info, instrument};
 
 #[derive(Args)]
@@ -78,18 +81,20 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
             .map(RoleId)
             .collect();
 
+    let oauth_adapter_config = OAuthAdapterConfig {
+        client_id: oauth_client_id,
+        client_secret: oauth_client_secret,
+        tenant_id,
+        authentication_callback_url,
+    };
+
     let intents = serenity::GatewayIntents::non_privileged();
 
     let database_connection = sqlx::PgPool::connect(&database_url).await?;
     let serenity_client = ClientBuilder::new(&discord_bot_token, intents).await?.http;
 
     let discord_adapter = Arc::new(DiscordAdapter::new(serenity_client.clone(), guild));
-    let oauth_adapter = Arc::new(OAuthAdapter::new(
-        authentication_callback_url,
-        oauth_client_id,
-        oauth_client_secret,
-        tenant_id,
-    ));
+    let oauth_adapter = Arc::new(OAuthAdapter::new(oauth_adapter_config));
     let archived_authenticated_user_repository = Arc::new(
         PostgresArchivedAuthenticatedUserRepository::new(database_connection.clone()),
     );
@@ -99,46 +104,50 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
     let user_authentication_request_repository = Arc::new(
         PostgresUserAuthenticationRequestRepository::new(database_connection.clone()),
     );
-
-    let user_role_service = Arc::new(
-        domain::user_role_service::UserRoleService::new(
-            discord_adapter.clone(),
-            additional_student_roles.clone(),
-        )
-        .await,
-    );
+    let (role_sync_job_wake_tx, role_sync_job_wake_rx) = tokio::sync::mpsc::channel(24);
+    let role_sync_requested_repository = Arc::new(PostgresRoleSyncRequestedRepository::new(
+        database_connection.clone(),
+        role_sync_job_wake_tx,
+    ));
 
     let authentication_adapter = Arc::new(AuthenticationService::new(
-        discord_adapter.clone(),
         oauth_adapter.clone(),
         archived_authenticated_user_repository.clone(),
         authenticated_user_repository.clone(),
         user_authentication_request_repository,
-        user_role_service.clone(),
+        role_sync_requested_repository.clone(),
         invite_link,
     ));
     let information_channel_adapter =
         Arc::new(InformationChannelService::new(discord_adapter.clone()));
+    let role_sync_job_handler_adapter = Arc::new(RoleSyncJobHandler::new(
+        discord_adapter.clone(),
+        authenticated_user_repository.clone(),
+        role_sync_requested_repository.clone(),
+        additional_student_roles,
+    ));
     let user_adapter = Arc::new(UserService::new(
-        discord_adapter,
         oauth_adapter,
         authenticated_user_repository,
-        user_role_service,
+        role_sync_requested_repository,
     ));
 
     let locator = locator::ApplicationPortLocator::new(
         authentication_adapter,
         information_channel_adapter,
         user_adapter,
+        role_sync_job_handler_adapter,
     );
 
     let api = tokio::spawn(run_api(locator.clone(), 8080));
-    let bot = tokio::spawn(run_bot(locator, discord_bot_token, intents, guild));
+    let bot = tokio::spawn(run_bot(locator.clone(), discord_bot_token, intents, guild));
+    let worker = tokio::spawn(run_worker(locator, role_sync_job_wake_rx));
 
     info!("Starting API and Discord bot...");
 
     api.await?.map_err(|e| anyhow!(e))?;
     bot.await?.map_err(|e| anyhow!(e))?;
+    worker.await?.map_err(|e| anyhow!(e))?;
 
     Ok(())
 }

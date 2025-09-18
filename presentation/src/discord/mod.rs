@@ -5,6 +5,7 @@ use tracing::instrument;
 
 mod buttons;
 pub mod commands;
+mod response;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a, D> = poise::Context<'a, D, Error>;

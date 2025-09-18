@@ -21,11 +21,19 @@ use oauth2::{
 use reqwest::Client as HttpClient;
 use serde::Deserialize;
 use std::time::Duration;
-use tracing::{instrument, warn};
+use tracing::{error, instrument, warn};
+
+#[derive(Clone, Debug)]
+pub struct OAuthAdapterConfig {
+    pub client_id: ClientId,
+    pub client_secret: ClientSecret,
+    pub tenant_id: TenantId,
+    pub authentication_callback_url: Url,
+}
 
 pub struct OAuthAdapter {
     oauth_client: OAuthClient,
-    pub http_client: HttpClient,
+    http_client: HttpClient,
 }
 
 #[derive(Clone, Debug)]
@@ -59,19 +67,8 @@ struct UserGroupResponse {
 
 impl OAuthAdapter {
     #[instrument(level = "trace", skip_all)]
-    pub fn new(
-        authentication_callback_url: Url,
-        client_id: ClientId,
-        client_secret: ClientSecret,
-        tenant_id: TenantId,
-    ) -> Self {
-        let oauth_client = create_oauth_client(
-            tenant_id.clone(),
-            client_id.clone(),
-            client_secret.clone(),
-            authentication_callback_url.clone(),
-        );
-
+    pub fn new(config: OAuthAdapterConfig) -> Self {
+        let oauth_client = create_oauth_client(config);
         let http_client = HttpClient::new();
 
         Self {
@@ -110,7 +107,13 @@ impl OAuthPort for OAuthAdapter {
             .request_async(&self.http_client)
             .await
             .map_err(|err| match err {
-                RequestTokenError::ServerResponse(_) => todo!(),
+                RequestTokenError::ServerResponse(_) => {
+                    error!(
+                        error = ?err,
+                        "OAuth exchange code after callback failed",
+                    );
+                    OAuthError::OAuthUnavailable
+                }
                 RequestTokenError::Request(err) => {
                     warn!("OAuth request failed with error: {:?}", err);
                     OAuthError::OAuthUnavailable
@@ -266,29 +269,21 @@ impl OAuthPort for OAuthAdapter {
     }
 }
 
-#[instrument(
-    level = "trace",
-    skip(tenant_id, client_id, client_secret, callback_url)
-)]
-fn create_oauth_client(
-    tenant_id: TenantId,
-    client_id: ClientId,
-    client_secret: ClientSecret,
-    callback_url: Url,
-) -> OAuthClient {
+#[instrument(level = "trace", skip(config))]
+fn create_oauth_client(config: OAuthAdapterConfig) -> OAuthClient {
     let auth_url = AuthUrl::new(format!(
         "https://login.microsoftonline.com/{}/oauth2/v2.0/authorize",
-        tenant_id.0
+        config.tenant_id.0
     ))
     .unwrap();
     let token_url = TokenUrl::new(format!(
         "https://login.microsoftonline.com/{}/oauth2/v2.0/token",
-        tenant_id.0
+        config.tenant_id.0
     ))
     .unwrap();
-    BasicClient::new(client_id)
-        .set_client_secret(client_secret)
+    BasicClient::new(config.client_id)
+        .set_client_secret(config.client_secret)
         .set_auth_uri(auth_url)
         .set_token_uri(token_url)
-        .set_redirect_uri(RedirectUrl::from_url(callback_url))
+        .set_redirect_uri(RedirectUrl::from_url(config.authentication_callback_url))
 }

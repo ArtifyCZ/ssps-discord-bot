@@ -10,9 +10,9 @@ domain-shared = { path = "../domain-shared" }
 async-trait = "0.1"
 chrono = "0.4"
 tracing = "0.1"
+tokio = { version = "1.47", features = ["full"] }
 
 [dev-dependencies]
 domain = { path = "../domain", features = ["mock"] }
 
 mockall = "0.13"
-tokio = { version = "1.43", features = ["full"] }

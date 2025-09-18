@@ -1,16 +1,17 @@
 use async_trait::async_trait;
 use domain::authentication::authenticated_user::{
-    AuthenticatedUser, AuthenticatedUserRepository, AuthenticatedUserSnapshot,
+    AuthenticatedUser, AuthenticatedUserRepository, AuthenticatedUserRepositoryError,
+    AuthenticatedUserSnapshot,
 };
 use domain::ports::oauth::OAuthToken;
 use domain_shared::authentication::{AccessToken, RefreshToken};
 use domain_shared::discord::UserId;
 use sqlx::{query, PgPool};
-use tracing::instrument;
+use tracing::{instrument, warn};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct PostgresAuthenticatedUserRepository {
     pool: PgPool,
@@ -43,7 +44,7 @@ macro_rules! record_to_user {
 #[async_trait]
 impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
     #[instrument(level = "debug", err, skip(self, user))]
-    async fn save(&self, user: &AuthenticatedUser) -> Result<()> {
+    async fn save(&self, user: &AuthenticatedUser) -> Result<(), AuthenticatedUserRepositoryError> {
         let AuthenticatedUserSnapshot {
             user_id,
             name,
@@ -58,29 +59,12 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
             authenticated_at,
         } = user.to_snapshot();
 
-        // Check if the user already exists
-        let exists = query!(
-            "SELECT EXISTS(SELECT 1 FROM authenticated_users WHERE user_id = $1)",
-            user_id.0 as i64,
-        )
-        .fetch_one(&self.pool)
-        .await?
-        .exists;
-        if let Some(true) = exists {
-            query!(
-            "UPDATE authenticated_users SET name = $1, email = $2, access_token = $3, access_token_expires_at = $4, refresh_token = $5, class_id = $6, authenticated_at = $7 WHERE user_id = $8",
-            name.clone(),
-            email.clone(),
-            access_token.0,
-            access_token_expires_at.naive_utc(),
-            refresh_token.0,
-            class_id,
-            authenticated_at.naive_utc(),
-            user_id.0 as i64,
-            ).execute(&self.pool).await?;
-        } else {
-            query!(
-            "INSERT INTO authenticated_users (user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        query!(
+            "INSERT INTO authenticated_users
+                (user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT (user_id) DO UPDATE SET
+                name = $2, email = $3, access_token = $4, access_token_expires_at = $5, refresh_token = $6, class_id = $7, authenticated_at = $8",
             user_id.0 as i64,
             name.clone(),
             email.clone(),
@@ -89,8 +73,7 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
             refresh_token.0,
             class_id,
             authenticated_at.naive_utc(),
-            ).execute(&self.pool).await?;
-        }
+        ).execute(&self.pool).await.map_err(map_err)?;
 
         Ok(())
     }
@@ -117,11 +100,14 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
     }
 
     #[instrument(level = "debug", err, skip(self, user_id))]
-    async fn find_by_user_id(&self, user_id: UserId) -> Result<Option<AuthenticatedUser>> {
+    async fn find_by_user_id(
+        &self,
+        user_id: UserId,
+    ) -> Result<Option<AuthenticatedUser>, AuthenticatedUserRepositoryError> {
         let row = query!(
             "SELECT user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at FROM authenticated_users WHERE user_id = $1",
             user_id.0 as i64,
-        ).fetch_optional(&self.pool).await?;
+        ).fetch_optional(&self.pool).await.map_err(map_err)?;
 
         if let Some(row) = row {
             Ok(Some(record_to_user!(row)))
@@ -143,4 +129,13 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
             Ok(None)
         }
     }
+}
+
+#[instrument(level = "trace", skip_all)]
+fn map_err(err: sqlx::Error) -> AuthenticatedUserRepositoryError {
+    warn!(
+        error = ?err,
+        "Failed to fetch authenticated user",
+    );
+    AuthenticatedUserRepositoryError::ServiceUnavailable
 }

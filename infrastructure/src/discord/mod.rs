@@ -19,6 +19,7 @@ use serenity::all::{Builder, Http};
 use serenity::futures::StreamExt;
 use std::ops::Not;
 use std::sync::Arc;
+use tokio::task::JoinSet;
 use tracing::{instrument, warn};
 
 pub struct DiscordAdapter {
@@ -116,43 +117,39 @@ impl DiscordPort for DiscordAdapter {
         reason: &str,
     ) -> Result<(), DiscordError> {
         let user_id = domain_to_serenity_user_id(user_id);
-        let mut failed = false;
+        let mut set = JoinSet::new();
 
         for role_id in &role_diff.to_assign {
             let role_id = domain_to_serenity_role_id(*role_id);
+            let guild_id = self.guild_id;
+            let client = self.client.clone();
+            let reason = reason.to_string();
 
-            match self
-                .client
-                .add_member_role(self.guild_id, user_id, role_id, Some(reason))
-                .await
-            {
-                Ok(()) => {}
-                Err(err) => {
-                    warn!(
-                        "Failed to assign role {} to user {}: {}",
-                        role_id, user_id, err
-                    );
-                    failed = true;
-                }
-            }
+            set.spawn(async move {
+                client
+                    .add_member_role(guild_id, user_id, role_id, Some(&reason))
+                    .await
+            });
         }
 
         for role_id in &role_diff.to_remove {
             let role_id = domain_to_serenity_role_id(*role_id);
+            let guild_id = self.guild_id;
+            let client = self.client.clone();
+            let reason = reason.to_string();
 
-            match self
-                .client
-                .remove_member_role(self.guild_id, user_id, role_id, Some(reason))
-                .await
-            {
-                Ok(()) => {}
-                Err(err) => {
-                    warn!(
-                        "Failed to remove role {} from user {}: {}",
-                        role_id, user_id, err
-                    );
-                    failed = true;
-                }
+            set.spawn(async move {
+                client
+                    .remove_member_role(guild_id, user_id, role_id, Some(&reason))
+                    .await
+            });
+        }
+
+        let mut failed = false;
+        for result in set.join_all().await {
+            if let Err(err) = result {
+                warn!("Failed to apply role diff to user {}: {}", user_id, err,);
+                failed = true;
             }
         }
 
@@ -166,6 +163,7 @@ impl DiscordPort for DiscordAdapter {
     #[instrument(level = "debug", err, skip_all)]
     async fn find_user_roles(&self, user_id: UserId) -> Result<Vec<Role>, DiscordError> {
         let user_id = domain_to_serenity_user_id(user_id);
+        let mut set = JoinSet::new();
 
         let member = self
             .client
@@ -179,23 +177,31 @@ impl DiscordPort for DiscordAdapter {
                 DiscordError::DiscordUnavailable
             })?;
 
-        let mut roles = Vec::new();
         for role_id in member.roles.iter() {
-            let role = self
-                .client
-                .get_guild_role(self.guild_id, *role_id)
-                .await
-                .map_err(|err| {
-                    warn!(
-                        "Failed to fetch role {} from guild {}: {}",
-                        role_id, self.guild_id, err,
-                    );
-                    DiscordError::DiscordUnavailable
-                })?;
-            roles.push(Role {
-                role_id: serenity_to_domain_role_id(role.id),
-                name: role.name,
+            let role_id = *role_id;
+            let guild_id = self.guild_id;
+            let client = self.client.clone();
+
+            set.spawn(async move {
+                match client.get_guild_role(guild_id, role_id).await {
+                    Ok(role) => Ok(Role {
+                        role_id: serenity_to_domain_role_id(role.id),
+                        name: role.name,
+                    }),
+                    Err(error) => {
+                        warn!(
+                            "Failed to fetch role {} from guild {}: {:?}",
+                            role_id, guild_id, error,
+                        );
+                        Err(DiscordError::DiscordUnavailable)
+                    }
+                }
             });
+        }
+
+        let mut roles = vec![];
+        for role in set.join_all().await {
+            roles.push(role?);
         }
 
         Ok(roles)

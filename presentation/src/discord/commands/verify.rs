@@ -1,10 +1,8 @@
 use crate::application_ports::Locator;
-use crate::discord::{Context, Error};
+use crate::discord::{response, Context, Error};
 use application_ports::authentication::AuthenticationError;
 use domain_shared::discord::UserId;
-use poise::serenity_prelude::{ButtonStyle, CreateActionRow, CreateButton, Mentionable};
-use poise::CreateReply;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 #[poise::command(
     slash_command,
@@ -24,32 +22,27 @@ pub async fn command<D: Sync + Locator>(ctx: Context<'_, D>) -> Result<(), Error
 
     let user = ctx.author();
 
-    let authentication_link = match authentication_port
+    let response = match authentication_port
         .create_authentication_link(UserId(user.id.get()))
         .await
     {
-        Ok(link) => link,
-        Err(AuthenticationError::TemporaryUnavailable) => todo!(),
-        Err(AuthenticationError::Error(error)) => return Err(error),
-        Err(AuthenticationError::AuthenticationRequestNotFound) => unreachable!(),
+        Ok(link) => response::authentication_link(link, user),
+        Err(AuthenticationError::TemporaryUnavailable) => response::temporary_unavailable(),
+        Err(AuthenticationError::Error(error)) => {
+            error!(
+                error = ?error,
+                "An unknown error occurred while creating authentication link",
+            );
+            response::temporary_unavailable()
+        }
+        Err(AuthenticationError::AuthenticationRequestNotFound) => {
+            error!(
+                "Unreachable: Got authentication request not found error when creating an authentication request",
+            );
+            response::temporary_unavailable()
+        }
     };
 
-    let response = format!(
-        "Hello, {}! Please verify your account by clicking the button.",
-        user.mention(),
-    );
-
-    let button = CreateButton::new_link(authentication_link.0)
-        .style(ButtonStyle::Primary)
-        .label("Verify");
-
-    let components = vec![CreateActionRow::Buttons(vec![button])];
-
-    let response = CreateReply::default()
-        .content(response)
-        .components(components)
-        .ephemeral(true)
-        .reply(true);
     ctx.send(response).await?;
 
     Ok(())

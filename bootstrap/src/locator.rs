@@ -1,8 +1,10 @@
 use application::authentication::AuthenticationService;
 use application::information_channel::InformationChannelService;
+use application::role_sync_job_handler::RoleSyncJobHandler;
 use application::user::UserService;
 use application_ports::authentication::AuthenticationPort;
 use application_ports::information_channel::InformationChannelPort;
+use application_ports::role_sync_job_handler::RoleSyncJobHandlerPort;
 use application_ports::user::UserPort;
 use presentation::application_ports::Locator;
 use std::sync::Arc;
@@ -13,6 +15,7 @@ pub struct ApplicationPortLocator {
     authentication_adapter: Arc<AuthenticationService>,
     information_channel_adapter: Arc<InformationChannelService>,
     user_adapter: Arc<UserService>,
+    role_sync_job_handler_adapter: Arc<RoleSyncJobHandler>,
 }
 
 impl ApplicationPortLocator {
@@ -21,11 +24,13 @@ impl ApplicationPortLocator {
         authentication_adapter: Arc<AuthenticationService>,
         information_channel_adapter: Arc<InformationChannelService>,
         user_adapter: Arc<UserService>,
+        role_sync_job_handler_adapter: Arc<RoleSyncJobHandler>,
     ) -> Self {
         Self {
             authentication_adapter,
             information_channel_adapter,
             user_adapter,
+            role_sync_job_handler_adapter,
         }
     }
 }
@@ -44,5 +49,10 @@ impl Locator for ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
     fn get_user_port(&self) -> &(dyn UserPort + Send + Sync) {
         &*self.user_adapter
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    fn get_role_sync_job_handler_port(&self) -> &(dyn RoleSyncJobHandlerPort + Send + Sync) {
+        &*self.role_sync_job_handler_adapter
     }
 }

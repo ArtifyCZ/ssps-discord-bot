@@ -29,6 +29,7 @@ pub async fn command<D: Sync + Locator>(
     let user_id = UserId(target.id.get());
 
     if force_refresh.unwrap_or(false) {
+        ctx.defer().await?;
         user_port.refresh_user_data(user_id).await?;
     }
 

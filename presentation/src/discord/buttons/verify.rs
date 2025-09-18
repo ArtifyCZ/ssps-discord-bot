@@ -1,12 +1,10 @@
 use crate::application_ports::Locator;
-use crate::discord::Error;
+use crate::discord::{response, Error};
 use application_ports::authentication::AuthenticationError;
 use domain_shared::discord::UserId;
-use poise::serenity_prelude::{
-    ButtonStyle, CreateActionRow, CreateButton, CreateInteractionResponse, Mentionable,
-};
-use poise::{serenity_prelude as serenity, CreateReply};
-use tracing::{info, instrument};
+use poise::serenity_prelude as serenity;
+use poise::serenity_prelude::{CacheHttp, CreateInteractionResponse};
+use tracing::{error, info, instrument};
 
 pub const BUTTON_ID: &str = domain::information_channel::VERIFY_ME_BUTTON_ID;
 
@@ -19,40 +17,33 @@ pub async fn handle_button_click<L: Locator>(
 ) -> Result<(), Error> {
     info!(
         user_id = interaction.user.id.get(),
-        "User clicked on the verify button.",
+        "User clicked on the verify button",
     );
 
     let authentication_port = locator.get_authentication_port();
+    interaction.defer(ctx.http()).await?;
 
-    let authentication_link = match authentication_port
+    let response = match authentication_port
         .create_authentication_link(UserId(interaction.user.id.get()))
         .await
     {
-        Ok(link) => link,
-        Err(AuthenticationError::TemporaryUnavailable) => {
-            todo!()
-            // send an ephemeral response to the user
+        Ok(link) => response::authentication_link(link, &interaction.user),
+        Err(AuthenticationError::TemporaryUnavailable) => response::temporary_unavailable(),
+        Err(AuthenticationError::Error(error)) => {
+            error!(
+                error = ?error,
+                "An unknown error occurred while creating authentication link",
+            );
+            response::temporary_unavailable()
         }
-        Err(AuthenticationError::Error(error)) => return Err(error),
-        Err(AuthenticationError::AuthenticationRequestNotFound) => unreachable!(),
+        Err(AuthenticationError::AuthenticationRequestNotFound) => {
+            error!(
+                "Unreachable: Got authentication request not found error when creating an authentication request",
+            );
+            response::temporary_unavailable()
+        }
     };
 
-    let response = format!(
-        "Ahoj, {}! Ověř svůj účet kliknutím na tlačítko.",
-        interaction.user.mention(),
-    );
-
-    let button = CreateButton::new_link(authentication_link.0)
-        .style(ButtonStyle::Primary)
-        .label("Ověřit se");
-
-    let components = vec![CreateActionRow::Buttons(vec![button])];
-
-    let response = CreateReply::default()
-        .content(response)
-        .components(components)
-        .ephemeral(true)
-        .reply(true);
     interaction
         .create_response(
             ctx,
