@@ -16,6 +16,7 @@ pub struct ApplicationPortLocator {
     information_channel_adapter: Arc<InformationChannelService>,
     user_adapter: Arc<UserService>,
     role_sync_job_handler_adapter: Arc<RoleSyncJobHandler>,
+    serenity_client: Arc<serenity::http::Http>,
 }
 
 impl ApplicationPortLocator {
@@ -25,12 +26,14 @@ impl ApplicationPortLocator {
         information_channel_adapter: Arc<InformationChannelService>,
         user_adapter: Arc<UserService>,
         role_sync_job_handler_adapter: Arc<RoleSyncJobHandler>,
+        serenity_client: Arc<serenity::http::Http>,
     ) -> Self {
         Self {
             authentication_adapter,
             information_channel_adapter,
             user_adapter,
             role_sync_job_handler_adapter,
+            serenity_client,
         }
     }
 }
@@ -54,5 +57,10 @@ impl Locator for ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
     fn get_role_sync_job_handler_port(&self) -> &(dyn RoleSyncJobHandlerPort + Send + Sync) {
         &*self.role_sync_job_handler_adapter
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    fn get_discord_client(&self) -> &serenity::http::Http {
+        self.serenity_client.as_ref()
     }
 }

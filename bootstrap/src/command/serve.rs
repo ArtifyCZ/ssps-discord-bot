@@ -137,6 +137,7 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         information_channel_adapter,
         user_adapter,
         role_sync_job_handler_adapter,
+        serenity_client.clone(),
     );
 
     let api = tokio::spawn(run_api(locator.clone(), 8080));

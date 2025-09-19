@@ -27,13 +27,22 @@ pub async fn handle_button_click<L: Locator>(
         .create_authentication_link(UserId(interaction.user.id.get()))
         .await
     {
-        Ok(link) => response::authentication_link(link, &interaction.user),
-        Err(AuthenticationError::TemporaryUnavailable) => response::temporary_unavailable(),
+        Ok(link) => {
+            let msg = response::authentication_link::authentication_link(link, &interaction.user);
+            let msg = interaction.user.direct_message(ctx, msg).await?;
+            response::authentication_link::tell_user_direct_message_sent(
+                &interaction.user,
+                &msg.link(),
+            )
+        }
+        Err(AuthenticationError::TemporaryUnavailable) => {
+            response::unavailable::temporary_unavailable()
+        }
         Err(AuthenticationError::AuthenticationRequestNotFound) => {
             error!(
                 "Unreachable: Got authentication request not found error when creating an authentication request",
             );
-            response::temporary_unavailable()
+            response::unavailable::temporary_unavailable()
         }
     };
 

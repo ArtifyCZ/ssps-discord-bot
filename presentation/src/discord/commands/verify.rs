@@ -26,13 +26,19 @@ pub async fn command<D: Sync + Locator>(ctx: Context<'_, D>) -> Result<(), Error
         .create_authentication_link(UserId(user.id.get()))
         .await
     {
-        Ok(link) => response::authentication_link(link, user),
-        Err(AuthenticationError::TemporaryUnavailable) => response::temporary_unavailable(),
+        Ok(link) => {
+            let msg = response::authentication_link::authentication_link(link, user);
+            let msg = user.direct_message(ctx.http(), msg).await?;
+            response::authentication_link::tell_user_direct_message_sent(user, &msg.link())
+        }
+        Err(AuthenticationError::TemporaryUnavailable) => {
+            response::unavailable::temporary_unavailable()
+        }
         Err(AuthenticationError::AuthenticationRequestNotFound) => {
             error!(
                 "Unreachable: Got authentication request not found error when creating an authentication request",
             );
-            response::temporary_unavailable()
+            response::unavailable::temporary_unavailable()
         }
     };
 

@@ -14,7 +14,7 @@ pub trait AuthenticationPort {
         &self,
         csrf_token: CsrfToken,
         client_callback_token: ClientCallbackToken,
-    ) -> Result<InviteLink, AuthenticationError>;
+    ) -> Result<(UserId, InviteLink), AuthenticationError>;
 }
 
 #[derive(Debug, Error)]

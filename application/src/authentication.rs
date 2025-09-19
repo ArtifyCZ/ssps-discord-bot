@@ -86,7 +86,7 @@ impl AuthenticationPort for AuthenticationService {
         &self,
         csrf_token: CsrfToken,
         client_callback_token: ClientCallbackToken,
-    ) -> Result<InviteLink, AuthenticationError> {
+    ) -> Result<(UserId, InviteLink), AuthenticationError> {
         let request = match self
             .user_authentication_request_repository
             .find_by_csrf_token(&csrf_token)
@@ -214,7 +214,7 @@ impl AuthenticationPort for AuthenticationService {
 
         info!(user_id = user_id.0, "User successfully authenticated");
 
-        Ok(self.invite_link.clone())
+        Ok((user.user_id(), self.invite_link.clone()))
     }
 }
 
