@@ -62,6 +62,17 @@ impl UserPort for UserService {
     }
 
     #[instrument(level = "info", skip(self))]
+    async fn refresh_user_roles(&self, user_id: UserId) -> Result<(), UserError> {
+        let request = request_role_sync(user_id);
+        self.role_sync_requested_repository
+            .save(&request)
+            .await
+            .map_err(map_role_sync_req_repo_err)?;
+        info!(user_id = user_id.0, "Role sync request sent successfully",);
+        Ok(())
+    }
+
+    #[instrument(level = "info", skip(self))]
     async fn refresh_user_data(&self, user_id: UserId) -> Result<(), UserError> {
         let mut user = self
             .authenticated_user_repository

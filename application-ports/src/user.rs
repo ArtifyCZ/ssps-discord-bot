@@ -9,6 +9,7 @@ pub trait UserPort {
         &self,
         user_id: UserId,
     ) -> Result<Option<AuthenticatedUserInfoDto>, UserError>;
+    async fn refresh_user_roles(&self, user_id: UserId) -> Result<(), UserError>;
     async fn refresh_user_data(&self, user_id: UserId) -> Result<(), UserError>;
 }
 
