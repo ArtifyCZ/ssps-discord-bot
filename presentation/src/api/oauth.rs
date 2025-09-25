@@ -63,6 +63,14 @@ fn response_auth_error(error: AuthenticationError) -> Response {
             warn!("Authentication is temporarily unavailable");
             (StatusCode::SERVICE_UNAVAILABLE, "Verification is currently unavailable, please contact the admin team and try later").into_response()
         }
+        AuthenticationError::AuthenticationRequestAlreadyConfirmed => {
+            warn!("Authentication request already confirmed");
+            (
+                StatusCode::NO_CONTENT,
+                "Authentication request already confirmed, the request may have been fulfilled already",
+            )
+                .into_response()
+        }
     }
 }
 

@@ -38,7 +38,8 @@ pub async fn handle_button_click<L: Locator>(
         Err(AuthenticationError::TemporaryUnavailable) => {
             response::unavailable::temporary_unavailable()
         }
-        Err(AuthenticationError::AuthenticationRequestNotFound) => {
+        Err(AuthenticationError::AuthenticationRequestAlreadyConfirmed)
+        | Err(AuthenticationError::AuthenticationRequestNotFound) => {
             error!(
                 "Unreachable: Got authentication request not found error when creating an authentication request",
             );

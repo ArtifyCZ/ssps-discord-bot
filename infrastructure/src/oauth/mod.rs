@@ -108,10 +108,7 @@ impl OAuthPort for OAuthAdapter {
             .await
             .map_err(|err| match err {
                 RequestTokenError::ServerResponse(_) => {
-                    error!(
-                        "OAuth exchange code after callback failed: {:?}",
-                        err,
-                    );
+                    error!("OAuth exchange code after callback failed: {:?}", err,);
                     OAuthError::OAuthUnavailable
                 }
                 RequestTokenError::Request(err) => {

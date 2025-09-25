@@ -40,6 +40,13 @@ pub async fn command<D: Sync + Locator>(ctx: Context<'_, D>) -> Result<(), Error
             );
             response::unavailable::temporary_unavailable()
         }
+        Err(AuthenticationError::AuthenticationRequestAlreadyConfirmed) => {
+            error!(
+                user_id = user.id.get(),
+                "Unreachable: Got authentication request already confirmed error when creating an authentication request",
+            );
+            response::unavailable::temporary_unavailable()
+        }
     };
 
     ctx.send(response).await?;

@@ -29,14 +29,16 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
             csrf_token,
             user_id,
             requested_at,
+            confirmed_at,
         } = request.to_snapshot();
 
         query!(
-            "INSERT INTO user_authentication_requests (csrf_token, user_id, requested_at) VALUES ($1, $2, $3)
-            ON CONFLICT (csrf_token) DO UPDATE SET user_id = $2, requested_at = $3",
+            "INSERT INTO user_authentication_requests (csrf_token, user_id, requested_at, confirmed_at) VALUES ($1, $2, $3, $4)
+            ON CONFLICT (csrf_token) DO UPDATE SET user_id = $2, requested_at = $3, confirmed_at = $4",
             csrf_token.0,
             user_id.0 as i64,
             requested_at.naive_utc(),
+            confirmed_at.map(|t| t.naive_utc()),
         ).execute(&self.pool).await.map_err(map_err)?;
 
         Ok(())
@@ -48,7 +50,7 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
         csrf_token: &CsrfToken,
     ) -> Result<Option<UserAuthenticationRequest>, UserAuthenticationRequestRepositoryError> {
         let row = query!(
-            "SELECT csrf_token, user_id, requested_at FROM user_authentication_requests WHERE csrf_token = $1",
+            "SELECT csrf_token, user_id, requested_at, confirmed_at FROM user_authentication_requests WHERE csrf_token = $1",
             csrf_token.0,
         )
         .fetch_optional(&self.pool)
@@ -60,27 +62,12 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
                     csrf_token: CsrfToken(row.csrf_token),
                     user_id: domain_shared::discord::UserId(row.user_id as u64),
                     requested_at: row.requested_at.and_utc(),
+                    confirmed_at: row.confirmed_at.map(|t| t.and_utc()),
                 },
             )))
         } else {
             Ok(None)
         }
-    }
-
-    #[instrument(level = "debug", err, skip(self, csrf_token))]
-    async fn remove_by_csrf_token(
-        &self,
-        csrf_token: &CsrfToken,
-    ) -> Result<(), UserAuthenticationRequestRepositoryError> {
-        query!(
-            "DELETE FROM user_authentication_requests WHERE csrf_token = $1",
-            csrf_token.0,
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(map_err)?;
-
-        Ok(())
     }
 }
 

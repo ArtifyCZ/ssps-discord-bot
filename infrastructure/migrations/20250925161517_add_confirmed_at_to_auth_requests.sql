@@ -1,0 +1,1 @@
+ALTER TABLE user_authentication_requests ADD COLUMN confirmed_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NULL;

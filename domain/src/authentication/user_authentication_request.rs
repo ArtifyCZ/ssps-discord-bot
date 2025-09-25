@@ -9,6 +9,7 @@ pub struct UserAuthenticationRequest {
     csrf_token: CsrfToken,
     user_id: UserId,
     requested_at: DateTime<Utc>,
+    confirmed_at: Option<DateTime<Utc>>,
 }
 
 #[instrument(level = "trace", skip(csrf_token))]
@@ -20,6 +21,7 @@ pub fn create_user_authentication_request(
         csrf_token,
         user_id,
         requested_at: Utc::now(),
+        confirmed_at: None,
     }
 }
 
@@ -38,6 +40,21 @@ impl UserAuthenticationRequest {
     pub fn requested_at(&self) -> DateTime<Utc> {
         self.requested_at
     }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn confirmed_at(&self) -> Option<DateTime<Utc>> {
+        self.confirmed_at
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn is_confirmed(&self) -> bool {
+        self.confirmed_at.is_some()
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn confirm(&mut self) {
+        self.confirmed_at = Some(Utc::now());
+    }
 }
 
 impl UserAuthenticationRequest {
@@ -47,6 +64,7 @@ impl UserAuthenticationRequest {
             csrf_token: snapshot.csrf_token,
             user_id: snapshot.user_id,
             requested_at: snapshot.requested_at,
+            confirmed_at: snapshot.confirmed_at,
         }
     }
 
@@ -56,6 +74,7 @@ impl UserAuthenticationRequest {
             csrf_token: self.csrf_token.clone(),
             user_id: self.user_id,
             requested_at: self.requested_at,
+            confirmed_at: self.confirmed_at,
         }
     }
 }
@@ -65,6 +84,7 @@ pub struct UserAuthenticationRequestSnapshot {
     pub csrf_token: CsrfToken,
     pub user_id: UserId,
     pub requested_at: DateTime<Utc>,
+    pub confirmed_at: Option<DateTime<Utc>>,
 }
 
 #[cfg_attr(feature = "mock", mockall::automock)]
@@ -78,10 +98,6 @@ pub trait UserAuthenticationRequestRepository {
         &self,
         csrf_token: &CsrfToken,
     ) -> Result<Option<UserAuthenticationRequest>, UserAuthenticationRequestRepositoryError>;
-    async fn remove_by_csrf_token(
-        &self,
-        csrf_token: &CsrfToken,
-    ) -> Result<(), UserAuthenticationRequestRepositoryError>;
 }
 
 #[derive(Debug, Error)]

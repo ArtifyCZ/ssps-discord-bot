@@ -23,4 +23,6 @@ pub enum AuthenticationError {
     AuthenticationRequestNotFound,
     #[error("Service is temporarily unavailable")]
     TemporaryUnavailable,
+    #[error("User authentication request was already confirmed")]
+    AuthenticationRequestAlreadyConfirmed,
 }

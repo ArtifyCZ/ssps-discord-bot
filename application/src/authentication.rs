@@ -87,7 +87,7 @@ impl AuthenticationPort for AuthenticationService {
         csrf_token: CsrfToken,
         client_callback_token: ClientCallbackToken,
     ) -> Result<(UserId, InviteLink), AuthenticationError> {
-        let request = match self
+        let mut request = match self
             .user_authentication_request_repository
             .find_by_csrf_token(&csrf_token)
             .await
@@ -102,6 +102,15 @@ impl AuthenticationPort for AuthenticationService {
                 return Err(AuthenticationError::AuthenticationRequestNotFound);
             }
         };
+
+        if request.is_confirmed() {
+            warn!(
+                csrf_token = csrf_token.0,
+                "The user tried to authenticate with an already confirmed CSRF token",
+            );
+            return Err(AuthenticationError::AuthenticationRequestAlreadyConfirmed);
+        }
+
         let user_id = request.user_id();
         Span::current().record("user_id", user_id.0);
 
@@ -170,6 +179,7 @@ impl AuthenticationPort for AuthenticationService {
                 .map_err(map_role_sync_req_repo_err)?;
         }
 
+        request.confirm();
         let user = create_user_from_successful_authentication(
             &request,
             user_info.name,
@@ -183,7 +193,7 @@ impl AuthenticationPort for AuthenticationService {
             .await
             .map_err(map_user_repo_err)?;
         self.user_authentication_request_repository
-            .remove_by_csrf_token(request.csrf_token())
+            .save(&request)
             .await
             .map_err(map_auth_req_repo_err)?;
 
