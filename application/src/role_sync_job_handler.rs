@@ -1,5 +1,6 @@
 use application_ports::role_sync_job_handler::{RoleSyncJobHandlerError, RoleSyncJobHandlerPort};
 use async_trait::async_trait;
+use chrono::{Duration, TimeDelta};
 use domain::authentication::authenticated_user::{
     AuthenticatedUser, AuthenticatedUserRepository, AuthenticatedUserRepositoryError,
 };
@@ -46,6 +47,17 @@ impl RoleSyncJobHandler {
 
     #[instrument(level = "info", skip(self))]
     async fn handle(&self, request: RoleSyncRequested) -> Result<(), RoleSyncJobHandlerError> {
+        const MIN_DURATION_SINCE_QUEUED: TimeDelta = Duration::milliseconds(400);
+        const WAIT_TICK_DURATION: TimeDelta = Duration::milliseconds(100);
+        let can_sync_since = request.queued_at + MIN_DURATION_SINCE_QUEUED;
+        loop {
+            if can_sync_since <= chrono::Utc::now() {
+                break;
+            }
+
+            tokio::time::sleep(WAIT_TICK_DURATION.to_std().unwrap()).await;
+        }
+
         let (class_id_to_role_id, assigned_roles, user) = tokio::try_join!(
             async move { self.get_or_create_class_id_to_role_id().await },
             async move {

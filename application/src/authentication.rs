@@ -13,10 +13,11 @@ use domain::authentication::user_authentication_request::{
     create_user_authentication_request, UserAuthenticationRequestRepository,
     UserAuthenticationRequestRepositoryError,
 };
-use domain::class::class_group::find_class_group;
-use domain::class::class_id::get_class_id;
 use domain::jobs::role_sync_job::{
     request_role_sync, RoleSyncRequestedRepository, RoleSyncRequestedRepositoryError,
+};
+use domain::jobs::user_info_sync_job::{
+    request_user_info_sync, UserInfoSyncRequestedRepository, UserInfoSyncRequestedRepositoryError,
 };
 use domain::ports::oauth::{OAuthError, OAuthPort};
 use domain_shared::authentication::{AuthenticationLink, ClientCallbackToken, CsrfToken};
@@ -31,6 +32,7 @@ pub struct AuthenticationService {
     authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
     user_authentication_request_repository:
         Arc<dyn UserAuthenticationRequestRepository + Send + Sync>,
+    user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
     role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
     invite_link: InviteLink,
 }
@@ -46,6 +48,7 @@ impl AuthenticationService {
         user_authentication_request_repository: Arc<
             dyn UserAuthenticationRequestRepository + Send + Sync,
         >,
+        user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
         role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
         invite_link: InviteLink,
     ) -> Self {
@@ -53,6 +56,7 @@ impl AuthenticationService {
             oauth_port,
             archived_authenticated_user_repository,
             authenticated_user_repository,
+            user_info_sync_requested_repository,
             user_authentication_request_repository,
             role_sync_requested_repository,
             invite_link,
@@ -142,8 +146,6 @@ impl AuthenticationPort for AuthenticationService {
                     AuthenticationError::TemporaryUnavailable
                 }
             })?;
-        let class_group = find_class_group(&user_info.groups);
-        let class_id = class_group.and_then(get_class_id);
 
         if let Some(user) = self
             .authenticated_user_repository
@@ -168,15 +170,15 @@ impl AuthenticationPort for AuthenticationService {
 
             info!(
                 user_id = user.user_id().0,
-                "Removing user roles due to new user authenticating with the same email asynchronously",
+                email = user.email(),
+                "Updating user's info due to a new user authenticating with the same email",
             );
 
-            let role_sync_request = request_role_sync(user.user_id());
-
-            self.role_sync_requested_repository
-                .save(&role_sync_request)
+            let user_info_request = request_user_info_sync(user.user_id());
+            self.user_info_sync_requested_repository
+                .save(&user_info_request)
                 .await
-                .map_err(map_role_sync_req_repo_err)?;
+                .map_err(map_user_info_sync_req_repo_err)?;
         }
 
         request.confirm();
@@ -185,7 +187,6 @@ impl AuthenticationPort for AuthenticationService {
             user_info.name,
             user_info.email,
             oauth_token,
-            class_id,
         );
 
         self.authenticated_user_repository
@@ -238,6 +239,17 @@ fn map_archived_user_repo_err(
 fn map_auth_req_repo_err(err: UserAuthenticationRequestRepositoryError) -> AuthenticationError {
     match err {
         UserAuthenticationRequestRepositoryError::TemporaryUnavailable => {
+            AuthenticationError::TemporaryUnavailable
+        }
+    }
+}
+
+#[instrument(level = "trace", skip_all)]
+fn map_user_info_sync_req_repo_err(
+    err: UserInfoSyncRequestedRepositoryError,
+) -> AuthenticationError {
+    match err {
+        UserInfoSyncRequestedRepositoryError::ServiceUnavailable => {
             AuthenticationError::TemporaryUnavailable
         }
     }

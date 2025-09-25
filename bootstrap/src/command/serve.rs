@@ -15,11 +15,13 @@ use application::authentication::AuthenticationService;
 use application::information_channel::InformationChannelService;
 use application::role_sync_job_handler::RoleSyncJobHandler;
 use application::user::UserService;
+use application::user_info_sync_job_handler::UserInfoSyncJobHandler;
 use infrastructure::authentication::archived_authenticated_user::PostgresArchivedAuthenticatedUserRepository;
 use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUserRepository;
 use infrastructure::authentication::user_authentication_request::PostgresUserAuthenticationRequestRepository;
 use infrastructure::discord::DiscordAdapter;
 use infrastructure::jobs::role_sync_job_repository::PostgresRoleSyncRequestedRepository;
+use infrastructure::jobs::user_info_sync_job_repository::PostgresUserInfoSyncRequestedRepository;
 use poise::serenity_prelude as serenity;
 use presentation::worker::run_worker;
 use tracing::{info, instrument};
@@ -109,12 +111,19 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         database_connection.clone(),
         role_sync_job_wake_tx,
     ));
+    let (user_info_sync_job_wake_tx, user_info_sync_job_wake_rx) = tokio::sync::mpsc::channel(24);
+    let user_info_sync_requested_repository =
+        Arc::new(PostgresUserInfoSyncRequestedRepository::new(
+            database_connection.clone(),
+            user_info_sync_job_wake_tx,
+        ));
 
     let authentication_adapter = Arc::new(AuthenticationService::new(
         oauth_adapter.clone(),
         archived_authenticated_user_repository.clone(),
         authenticated_user_repository.clone(),
         user_authentication_request_repository,
+        user_info_sync_requested_repository.clone(),
         role_sync_requested_repository.clone(),
         invite_link,
     ));
@@ -126,10 +135,16 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         role_sync_requested_repository.clone(),
         additional_student_roles,
     ));
+    let user_info_sync_job_handler_adapter = Arc::new(UserInfoSyncJobHandler::new(
+        oauth_adapter.clone(),
+        authenticated_user_repository.clone(),
+        role_sync_requested_repository.clone(),
+        user_info_sync_requested_repository.clone(),
+    ));
     let user_adapter = Arc::new(UserService::new(
-        oauth_adapter,
         authenticated_user_repository,
         role_sync_requested_repository,
+        user_info_sync_requested_repository,
     ));
 
     let locator = locator::ApplicationPortLocator::new(
@@ -137,12 +152,17 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         information_channel_adapter,
         user_adapter,
         role_sync_job_handler_adapter,
+        user_info_sync_job_handler_adapter,
         serenity_client.clone(),
     );
 
     let api = tokio::spawn(run_api(locator.clone(), 8080));
     let bot = tokio::spawn(run_bot(locator.clone(), discord_bot_token, intents, guild));
-    let worker = tokio::spawn(run_worker(locator, role_sync_job_wake_rx));
+    let worker = tokio::spawn(run_worker(
+        locator,
+        role_sync_job_wake_rx,
+        user_info_sync_job_wake_rx,
+    ));
 
     info!("Starting API and Discord bot...");
 

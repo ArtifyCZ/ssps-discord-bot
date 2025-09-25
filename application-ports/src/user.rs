@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::Duration;
 use domain_shared::discord::UserId;
 use thiserror::Error;
 use tracing::error;
@@ -10,7 +11,7 @@ pub trait UserPort {
         user_id: UserId,
     ) -> Result<Option<AuthenticatedUserInfoDto>, UserError>;
     async fn refresh_user_roles(&self, user_id: UserId) -> Result<(), UserError>;
-    async fn refresh_user_data(&self, user_id: UserId) -> Result<(), UserError>;
+    async fn refresh_user_info(&self, user_id: UserId) -> Result<Duration, UserError>;
 }
 
 #[derive(Debug, Error)]

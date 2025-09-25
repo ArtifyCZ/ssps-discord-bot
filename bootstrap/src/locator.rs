@@ -2,10 +2,12 @@ use application::authentication::AuthenticationService;
 use application::information_channel::InformationChannelService;
 use application::role_sync_job_handler::RoleSyncJobHandler;
 use application::user::UserService;
+use application::user_info_sync_job_handler::UserInfoSyncJobHandler;
 use application_ports::authentication::AuthenticationPort;
 use application_ports::information_channel::InformationChannelPort;
 use application_ports::role_sync_job_handler::RoleSyncJobHandlerPort;
 use application_ports::user::UserPort;
+use application_ports::user_info_sync_job_handler::UserInfoSyncJobHandlerPort;
 use presentation::application_ports::Locator;
 use std::sync::Arc;
 use tracing::instrument;
@@ -16,6 +18,7 @@ pub struct ApplicationPortLocator {
     information_channel_adapter: Arc<InformationChannelService>,
     user_adapter: Arc<UserService>,
     role_sync_job_handler_adapter: Arc<RoleSyncJobHandler>,
+    user_info_sync_job_handler_adapter: Arc<UserInfoSyncJobHandler>,
     serenity_client: Arc<serenity::http::Http>,
 }
 
@@ -26,6 +29,7 @@ impl ApplicationPortLocator {
         information_channel_adapter: Arc<InformationChannelService>,
         user_adapter: Arc<UserService>,
         role_sync_job_handler_adapter: Arc<RoleSyncJobHandler>,
+        user_info_sync_job_handler_adapter: Arc<UserInfoSyncJobHandler>,
         serenity_client: Arc<serenity::http::Http>,
     ) -> Self {
         Self {
@@ -33,6 +37,7 @@ impl ApplicationPortLocator {
             information_channel_adapter,
             user_adapter,
             role_sync_job_handler_adapter,
+            user_info_sync_job_handler_adapter,
             serenity_client,
         }
     }
@@ -57,6 +62,13 @@ impl Locator for ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
     fn get_role_sync_job_handler_port(&self) -> &(dyn RoleSyncJobHandlerPort + Send + Sync) {
         &*self.role_sync_job_handler_adapter
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    fn get_user_info_sync_job_handler_port(
+        &self,
+    ) -> &(dyn UserInfoSyncJobHandlerPort + Send + Sync) {
+        &*self.user_info_sync_job_handler_adapter
     }
 
     #[instrument(level = "trace", skip(self))]

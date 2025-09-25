@@ -31,7 +31,8 @@ pub async fn command<D: Sync + Locator>(
 
     if force_refresh {
         ctx.defer_ephemeral().await?;
-        user_port.refresh_user_data(user_id).await?;
+        let wait_for_sync_duration = user_port.refresh_user_info(user_id).await?;
+        tokio::time::sleep(wait_for_sync_duration.to_std().unwrap()).await;
     }
 
     let user_info = match user_port.get_user_info(user_id).await {

@@ -33,15 +33,9 @@ impl AuthenticatedUser {
     }
 
     #[instrument(level = "trace", skip(self))]
-    pub fn set_user_info(&mut self, name: String, email: String, class_id: Option<String>) {
+    pub fn update_user_info(&mut self, name: String, email: String) {
         self.name = name;
         self.email = email;
-        self.class_id = class_id;
-    }
-
-    #[instrument(level = "trace", skip(self))]
-    pub fn set_class_id(&mut self, class_id: String) {
-        self.class_id = Some(class_id);
     }
 
     #[instrument(level = "trace", skip(self))]
@@ -60,6 +54,16 @@ impl AuthenticatedUser {
     }
 
     #[instrument(level = "trace", skip(self))]
+    pub fn update_class_id(&mut self, class_id: String) {
+        self.class_id = Some(class_id);
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn mark_class_unknown(&mut self) {
+        self.class_id = None;
+    }
+
+    #[instrument(level = "trace", skip(self))]
     pub fn authenticated_at(&self) -> DateTime<Utc> {
         self.authenticated_at
     }
@@ -71,14 +75,13 @@ pub fn create_user_from_successful_authentication(
     name: String,
     email: String,
     oauth_token: OAuthToken,
-    class_id: Option<String>,
 ) -> AuthenticatedUser {
     AuthenticatedUser {
         user_id: request.user_id(),
         name,
         email,
         oauth_token,
-        class_id,
+        class_id: None,
         authenticated_at: Utc::now(),
     }
 }
