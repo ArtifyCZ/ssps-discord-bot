@@ -2,6 +2,7 @@ use application_ports::user_info_sync_job_handler::{
     UserInfoSyncJobHandlerError, UserInfoSyncJobHandlerPort,
 };
 use async_trait::async_trait;
+use chrono::{Duration, TimeDelta};
 use domain::authentication::authenticated_user::{
     AuthenticatedUser, AuthenticatedUserRepository, AuthenticatedUserRepositoryError,
 };
@@ -45,6 +46,17 @@ impl UserInfoSyncJobHandler {
         &self,
         request: UserInfoSyncRequested,
     ) -> Result<(), UserInfoSyncJobHandlerError> {
+        const MIN_DURATION_SINCE_QUEUED: TimeDelta = Duration::milliseconds(400);
+        const WAIT_TICK_DURATION: TimeDelta = Duration::milliseconds(100);
+        let can_sync_since = request.queued_at + MIN_DURATION_SINCE_QUEUED;
+        loop {
+            if can_sync_since <= chrono::Utc::now() {
+                break;
+            }
+
+            tokio::time::sleep(WAIT_TICK_DURATION.to_std().unwrap()).await;
+        }
+
         let user = self
             .authenticated_user_repository
             .find_by_user_id(request.user_id)

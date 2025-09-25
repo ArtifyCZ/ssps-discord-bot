@@ -50,6 +50,8 @@ pub struct ServeArgs {
     pub invite_link: String,
     #[arg(long, env = "ADDITIONAL_STUDENT_ROLES")]
     pub additional_student_roles: String,
+    #[arg(long, env = "UNKNOWN_CLASS_ROLE_ID")]
+    pub unknown_class_role_id: u64,
 }
 
 #[instrument(level = "trace", skip(common_args, args))]
@@ -70,6 +72,7 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         tenant_id,
         invite_link,
         additional_student_roles,
+        unknown_class_role_id,
     } = args;
     let guild = GuildId::new(guild);
     let authentication_callback_url = Url::parse(&authentication_callback_url)?;
@@ -82,6 +85,7 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
             .into_iter()
             .map(RoleId)
             .collect();
+    let unknown_class_role_id = RoleId(unknown_class_role_id);
 
     let oauth_adapter_config = OAuthAdapterConfig {
         client_id: oauth_client_id,
@@ -134,6 +138,7 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         authenticated_user_repository.clone(),
         role_sync_requested_repository.clone(),
         additional_student_roles,
+        unknown_class_role_id,
     ));
     let user_info_sync_job_handler_adapter = Arc::new(UserInfoSyncJobHandler::new(
         oauth_adapter.clone(),

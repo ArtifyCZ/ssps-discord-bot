@@ -22,6 +22,7 @@ pub struct RoleSyncJobHandler {
     additional_student_roles: Vec<RoleId>,
     class_ids: Vec<String>,
     class_id_to_role_id: Mutex<Option<Vec<(String, RoleId)>>>,
+    unknown_class_role_id: RoleId,
 }
 
 impl RoleSyncJobHandler {
@@ -31,6 +32,7 @@ impl RoleSyncJobHandler {
         authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
         role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
         additional_student_roles: Vec<RoleId>,
+        unknown_class_role_id: RoleId,
     ) -> Self {
         let class_ids = create_class_ids();
         let class_id_to_role_id = Mutex::new(None);
@@ -42,6 +44,7 @@ impl RoleSyncJobHandler {
             additional_student_roles,
             class_ids,
             class_id_to_role_id,
+            unknown_class_role_id,
         }
     }
 
@@ -106,6 +109,11 @@ impl RoleSyncJobHandler {
         }
 
         for assigned_role in assigned_roles {
+            if assigned_role.role_id == self.unknown_class_role_id {
+                to_remove.push(assigned_role.role_id);
+                continue;
+            }
+
             for class_id in &self.class_ids {
                 if assigned_role.name.eq_ignore_ascii_case(class_id) {
                     to_remove.push(assigned_role.role_id);
@@ -141,6 +149,11 @@ impl RoleSyncJobHandler {
 
         // The user has a class role that does not match their class_id
         for assigned_role in assigned_roles {
+            if assigned_role.role_id == self.unknown_class_role_id && user.class_id().is_some() {
+                to_remove.push(assigned_role.role_id);
+                continue;
+            }
+
             for class_id in &self.class_ids {
                 if user.class_id().map(|c| class_id != c).unwrap_or(true)
                     && assigned_role.name.eq_ignore_ascii_case(class_id)
@@ -170,6 +183,12 @@ impl RoleSyncJobHandler {
             {
                 to_assign.push(*class_role_id);
             }
+        } else if assigned_roles
+            .iter()
+            .any(|r| r.role_id == self.unknown_class_role_id)
+            .not()
+        {
+            to_assign.push(self.unknown_class_role_id);
         }
 
         Ok(RoleDiff {
