@@ -12,7 +12,7 @@ pub struct ArchivedAuthenticatedUser {
     name: String,
     email: String,
     oauth_token: OAuthToken,
-    class_id: String,
+    class_id: Option<String>,
     authenticated_at: DateTime<Utc>,
 }
 
@@ -48,8 +48,8 @@ impl ArchivedAuthenticatedUser {
     }
 
     #[instrument(level = "trace", skip(self))]
-    pub fn class_id(&self) -> &str {
-        &self.class_id
+    pub fn class_id(&self) -> Option<&str> {
+        self.class_id.as_deref()
     }
 
     #[instrument(level = "trace", skip(self))]
@@ -69,7 +69,7 @@ pub fn create_archived_authenticated_user_from_user(
     let name = user.name().to_string();
     let email = user.email().to_string();
     let oauth_token = user.oauth_token().clone();
-    let class_id = user.class_id().to_string();
+    let class_id = user.class_id().map(|c| c.to_string());
     let authenticated_at = user.authenticated_at();
 
     ArchivedAuthenticatedUser {
@@ -114,7 +114,7 @@ pub struct ArchivedAuthenticatedUserSnapshot {
     pub name: String,
     pub email: String,
     pub oauth_token: OAuthToken,
-    pub class_id: String,
+    pub class_id: Option<String>,
     pub authenticated_at: DateTime<Utc>,
 }
 

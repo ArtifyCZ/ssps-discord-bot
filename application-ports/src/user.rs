@@ -24,6 +24,6 @@ pub struct AuthenticatedUserInfoDto {
     pub user_id: UserId,
     pub name: String,
     pub email: String,
-    pub class_id: String,
+    pub class_id: Option<String>,
     pub authenticated_at: chrono::DateTime<chrono::Utc>,
 }

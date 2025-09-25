@@ -64,7 +64,11 @@ pub async fn command<D: Sync + Locator>(
                 ("User ID", user_id.0.to_string(), false),
                 ("Jméno", name, false),
                 ("Email", email.to_string(), false),
-                ("Třída", class_id, false),
+                (
+                    "Třída",
+                    class_id.unwrap_or_else(|| "N/A".to_string()),
+                    false,
+                ),
                 ("Ověřen", authenticated_at.to_rfc2822(), false),
             ]),
         None => CreateEmbed::default()

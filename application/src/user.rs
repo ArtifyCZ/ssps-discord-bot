@@ -56,7 +56,7 @@ impl UserPort for UserService {
             user_id: user.user_id(),
             name: user.name().to_string(),
             email: user.email().to_string(),
-            class_id: user.class_id().to_string(),
+            class_id: user.class_id().map(|s| s.to_string()),
             authenticated_at: user.authenticated_at(),
         }))
     }
@@ -99,22 +99,8 @@ impl UserPort for UserService {
             .await
             .map_err(map_oauth_err)?;
 
-        let class_group = find_class_group(&user_info.groups).ok_or_else(|| {
-            error!(
-                user_id = user.user_id().0,
-                groups = ?&user_info.groups,
-                "Could not find class group in user's groups",
-            );
-            UserError::TemporaryUnavailable
-        })?;
-        let class_id = get_class_id(class_group).ok_or_else(|| {
-            error!(
-                user_id = user.user_id().0,
-                class_group = ?&class_group,
-                "Could not find class ID for class group",
-            );
-            UserError::TemporaryUnavailable
-        })?;
+        let class_group = find_class_group(&user_info.groups);
+        let class_id = class_group.and_then(get_class_id);
 
         user.set_user_info(user_info.name, user_info.email, class_id);
         self.authenticated_user_repository

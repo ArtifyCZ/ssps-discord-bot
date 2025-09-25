@@ -133,22 +133,8 @@ impl AuthenticationPort for AuthenticationService {
                     AuthenticationError::TemporaryUnavailable
                 }
             })?;
-        let class_group = find_class_group(&user_info.groups).ok_or_else(|| {
-            error!(
-                user_id = user_id.0,
-                groups = ?&user_info.groups,
-                "Could not find class group in user's groups",
-            );
-            AuthenticationError::TemporaryUnavailable
-        })?;
-        let class_id = get_class_id(class_group).ok_or_else(|| {
-            error!(
-                user_id = user_id.0,
-                class_group = ?class_group,
-                "Could not find class ID from class group",
-            );
-            AuthenticationError::TemporaryUnavailable
-        })?;
+        let class_group = find_class_group(&user_info.groups);
+        let class_id = class_group.and_then(get_class_id);
 
         if let Some(user) = self
             .authenticated_user_repository

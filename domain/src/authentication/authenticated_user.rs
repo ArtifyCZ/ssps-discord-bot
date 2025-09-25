@@ -12,7 +12,7 @@ pub struct AuthenticatedUser {
     name: String,
     email: String,
     oauth_token: OAuthToken,
-    class_id: String,
+    class_id: Option<String>,
     authenticated_at: DateTime<Utc>,
 }
 
@@ -33,7 +33,7 @@ impl AuthenticatedUser {
     }
 
     #[instrument(level = "trace", skip(self))]
-    pub fn set_user_info(&mut self, name: String, email: String, class_id: String) {
+    pub fn set_user_info(&mut self, name: String, email: String, class_id: Option<String>) {
         self.name = name;
         self.email = email;
         self.class_id = class_id;
@@ -41,7 +41,7 @@ impl AuthenticatedUser {
 
     #[instrument(level = "trace", skip(self))]
     pub fn set_class_id(&mut self, class_id: String) {
-        self.class_id = class_id;
+        self.class_id = Some(class_id);
     }
 
     #[instrument(level = "trace", skip(self))]
@@ -55,8 +55,8 @@ impl AuthenticatedUser {
     }
 
     #[instrument(level = "trace", skip(self))]
-    pub fn class_id(&self) -> &str {
-        &self.class_id
+    pub fn class_id(&self) -> Option<&str> {
+        self.class_id.as_deref()
     }
 
     #[instrument(level = "trace", skip(self))]
@@ -71,7 +71,7 @@ pub fn create_user_from_successful_authentication(
     name: String,
     email: String,
     oauth_token: OAuthToken,
-    class_id: String,
+    class_id: Option<String>,
 ) -> AuthenticatedUser {
     AuthenticatedUser {
         user_id: request.user_id(),
@@ -115,7 +115,7 @@ pub struct AuthenticatedUserSnapshot {
     pub name: String,
     pub email: String,
     pub oauth_token: OAuthToken,
-    pub class_id: String,
+    pub class_id: Option<String>,
     pub authenticated_at: DateTime<Utc>,
 }
 

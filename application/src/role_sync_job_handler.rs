@@ -130,31 +130,34 @@ impl RoleSyncJobHandler {
         // The user has a class role that does not match their class_id
         for assigned_role in assigned_roles {
             for class_id in &self.class_ids {
-                if class_id != user.class_id() && assigned_role.name.eq_ignore_ascii_case(class_id)
+                if user.class_id().map(|c| class_id != c).unwrap_or(true)
+                    && assigned_role.name.eq_ignore_ascii_case(class_id)
                 {
                     to_remove.push(assigned_role.role_id);
                 }
             }
         }
 
-        let (_, class_role_id) = class_id_to_role_id
-            .iter()
-            .find(|(c, _)| c.eq_ignore_ascii_case(user.class_id()))
-            .ok_or_else(|| {
-                error!(
-                    user_id = user.user_id().0,
-                    "Class role not found for user's class {}",
-                    user.class_id(),
-                );
-                RoleSyncJobHandlerError::TemporaryUnavailable
-            })?;
+        if let Some(class_id) = user.class_id() {
+            let (_, class_role_id) = class_id_to_role_id
+                .iter()
+                .find(|(c, _)| c.eq_ignore_ascii_case(class_id))
+                .ok_or_else(|| {
+                    error!(
+                        user_id = user.user_id().0,
+                        "Class role not found for user's class {}",
+                        user.class_id().unwrap_or("unknown class"),
+                    );
+                    RoleSyncJobHandlerError::TemporaryUnavailable
+                })?;
 
-        if assigned_roles
-            .iter()
-            .any(|r| r.role_id == *class_role_id)
-            .not()
-        {
-            to_assign.push(*class_role_id);
+            if assigned_roles
+                .iter()
+                .any(|r| r.role_id == *class_role_id)
+                .not()
+            {
+                to_assign.push(*class_role_id);
+            }
         }
 
         Ok(RoleDiff {
