@@ -13,7 +13,7 @@ use domain::roles::{diff_additional_student_roles, diff_class_roles, diff_everyo
 use domain_shared::discord::RoleId;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{error, instrument};
+use tracing::{error, info, instrument};
 
 pub struct RoleSyncJobHandler {
     discord_port: Arc<dyn DiscordPort + Send + Sync>,
@@ -91,6 +91,11 @@ impl RoleSyncJobHandler {
             .apply_role_diff(request.user_id, &role_diff, "Role sync job handler")
             .await
             .map_err(map_discord_err)?;
+
+        info!(
+            "Successfully synced roles for user {:?} with diff {:?}",
+            request.user_id, role_diff,
+        );
 
         Ok(())
     }
