@@ -48,6 +48,8 @@ pub struct ServeArgs {
     /// The invite link for the Discord server
     #[arg(long, env = "INVITE_LINK")]
     pub invite_link: String,
+    #[arg(long, env = "EVERYONE_ROLES")]
+    pub everyone_roles: String,
     #[arg(long, env = "ADDITIONAL_STUDENT_ROLES")]
     pub additional_student_roles: String,
     #[arg(long, env = "UNKNOWN_CLASS_ROLE_ID")]
@@ -71,6 +73,7 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         oauth_client_secret,
         tenant_id,
         invite_link,
+        everyone_roles,
         additional_student_roles,
         unknown_class_role_id,
     } = args;
@@ -80,6 +83,10 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
     let oauth_client_secret = ClientSecret::new(oauth_client_secret);
     let tenant_id = TenantId(tenant_id);
     let invite_link = InviteLink(invite_link);
+    let everyone_roles: Vec<RoleId> = serde_json::from_str::<Vec<u64>>(&everyone_roles)?
+        .into_iter()
+        .map(RoleId)
+        .collect();
     let additional_student_roles: Vec<RoleId> =
         serde_json::from_str::<Vec<u64>>(&additional_student_roles)?
             .into_iter()
@@ -137,6 +144,7 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         discord_adapter.clone(),
         authenticated_user_repository.clone(),
         role_sync_requested_repository.clone(),
+        everyone_roles,
         additional_student_roles,
         unknown_class_role_id,
     ));

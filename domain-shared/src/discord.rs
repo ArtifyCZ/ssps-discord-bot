@@ -4,7 +4,7 @@ pub struct ChannelId(pub u64);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UserId(pub u64);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RoleId(pub u64);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

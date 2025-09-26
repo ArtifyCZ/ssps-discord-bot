@@ -9,8 +9,8 @@ use domain::jobs::role_sync_job::{
     RoleSyncRequested, RoleSyncRequestedRepository, RoleSyncRequestedRepositoryError,
 };
 use domain::ports::discord::{DiscordError, DiscordPort, Role, RoleDiff};
+use domain::roles::{diff_additional_student_roles, diff_class_roles, diff_everyone_roles};
 use domain_shared::discord::RoleId;
-use std::ops::Not;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{error, instrument};
@@ -19,6 +19,7 @@ pub struct RoleSyncJobHandler {
     discord_port: Arc<dyn DiscordPort + Send + Sync>,
     authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
     role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
+    everyone_roles: Vec<RoleId>,
     additional_student_roles: Vec<RoleId>,
     class_ids: Vec<String>,
     class_id_to_role_id: Mutex<Option<Vec<(String, RoleId)>>>,
@@ -31,6 +32,7 @@ impl RoleSyncJobHandler {
         discord_port: Arc<dyn DiscordPort + Send + Sync>,
         authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
         role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
+        everyone_roles: Vec<RoleId>,
         additional_student_roles: Vec<RoleId>,
         unknown_class_role_id: RoleId,
     ) -> Self {
@@ -41,6 +43,7 @@ impl RoleSyncJobHandler {
             discord_port,
             authenticated_user_repository,
             role_sync_requested_repository,
+            everyone_roles,
             additional_student_roles,
             class_ids,
             class_id_to_role_id,
@@ -78,7 +81,7 @@ impl RoleSyncJobHandler {
         )?;
 
         let role_diff = match user {
-            None => self.handle_unauthenticated_user(&assigned_roles),
+            None => self.handle_unauthenticated_user(&assigned_roles, &class_id_to_role_id),
             Some(user) => {
                 self.handle_authenticated_user(&user, &assigned_roles, &class_id_to_role_id)
             }
@@ -96,35 +99,22 @@ impl RoleSyncJobHandler {
     fn handle_unauthenticated_user(
         &self,
         assigned_roles: &Vec<Role>,
+        class_id_to_role_id: &Vec<(String, RoleId)>,
     ) -> Result<RoleDiff, RoleSyncJobHandlerError> {
-        let mut to_remove = Vec::new();
+        let mut diff = RoleDiff::default();
 
-        for additional_student_role in &self.additional_student_roles {
-            if assigned_roles
-                .iter()
-                .any(|r| r.role_id == *additional_student_role)
-            {
-                to_remove.push(*additional_student_role);
-            }
-        }
+        diff += diff_everyone_roles(&self.everyone_roles, assigned_roles);
+        diff +=
+            diff_additional_student_roles(&self.additional_student_roles, assigned_roles, false);
+        diff += diff_class_roles(
+            self.unknown_class_role_id,
+            &self.class_ids,
+            class_id_to_role_id,
+            None,
+            assigned_roles,
+        );
 
-        for assigned_role in assigned_roles {
-            if assigned_role.role_id == self.unknown_class_role_id {
-                to_remove.push(assigned_role.role_id);
-                continue;
-            }
-
-            for class_id in &self.class_ids {
-                if assigned_role.name.eq_ignore_ascii_case(class_id) {
-                    to_remove.push(assigned_role.role_id);
-                }
-            }
-        }
-
-        Ok(RoleDiff {
-            to_assign: vec![],
-            to_remove,
-        })
+        Ok(diff)
     }
 
     #[instrument(level = "trace", skip(self))]
@@ -134,67 +124,19 @@ impl RoleSyncJobHandler {
         assigned_roles: &Vec<Role>,
         class_id_to_role_id: &Vec<(String, RoleId)>,
     ) -> Result<RoleDiff, RoleSyncJobHandlerError> {
-        let mut to_assign = Vec::new();
-        let mut to_remove = Vec::new();
+        let mut diff = RoleDiff::default();
 
-        for additional_student_role in &self.additional_student_roles {
-            if assigned_roles
-                .iter()
-                .any(|r| r.role_id == *additional_student_role)
-                .not()
-            {
-                to_assign.push(*additional_student_role);
-            }
-        }
+        diff += diff_everyone_roles(&self.everyone_roles, assigned_roles);
+        diff += diff_additional_student_roles(&self.additional_student_roles, assigned_roles, true);
+        diff += diff_class_roles(
+            self.unknown_class_role_id,
+            &self.class_ids,
+            class_id_to_role_id,
+            Some(user),
+            assigned_roles,
+        );
 
-        // The user has a class role that does not match their class_id
-        for assigned_role in assigned_roles {
-            if assigned_role.role_id == self.unknown_class_role_id && user.class_id().is_some() {
-                to_remove.push(assigned_role.role_id);
-                continue;
-            }
-
-            for class_id in &self.class_ids {
-                if user.class_id().map(|c| class_id != c).unwrap_or(true)
-                    && assigned_role.name.eq_ignore_ascii_case(class_id)
-                {
-                    to_remove.push(assigned_role.role_id);
-                }
-            }
-        }
-
-        if let Some(class_id) = user.class_id() {
-            let (_, class_role_id) = class_id_to_role_id
-                .iter()
-                .find(|(c, _)| c.eq_ignore_ascii_case(class_id))
-                .ok_or_else(|| {
-                    error!(
-                        user_id = user.user_id().0,
-                        "Class role not found for user's class {}",
-                        user.class_id().unwrap_or("unknown class"),
-                    );
-                    RoleSyncJobHandlerError::TemporaryUnavailable
-                })?;
-
-            if assigned_roles
-                .iter()
-                .any(|r| r.role_id == *class_role_id)
-                .not()
-            {
-                to_assign.push(*class_role_id);
-            }
-        } else if assigned_roles
-            .iter()
-            .any(|r| r.role_id == self.unknown_class_role_id)
-            .not()
-        {
-            to_assign.push(self.unknown_class_role_id);
-        }
-
-        Ok(RoleDiff {
-            to_assign,
-            to_remove,
-        })
+        Ok(diff)
     }
 
     #[instrument(level = "trace", skip(self))]
