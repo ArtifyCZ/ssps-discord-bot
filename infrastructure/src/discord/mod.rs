@@ -8,7 +8,7 @@ mod user_id;
 use crate::discord::channel_id::domain_to_serenity_channel_id;
 use crate::discord::create_message::domain_to_serenity_create_message;
 use crate::discord::role_id::{domain_to_serenity_role_id, serenity_to_domain_role_id};
-use crate::discord::user_id::domain_to_serenity_user_id;
+use crate::discord::user_id::{domain_to_serenity_user_id, serenity_to_domain_user_id};
 use async_trait::async_trait;
 use domain::ports::discord::{ChannelId, CreateMessage, DiscordPort, Role, RoleDiff};
 use domain::ports::discord::{DiscordError, Result};
@@ -20,7 +20,7 @@ use serenity::futures::StreamExt;
 use std::ops::Not;
 use std::sync::Arc;
 use tokio::task::JoinSet;
-use tracing::{instrument, warn};
+use tracing::{error, instrument, warn};
 
 pub struct DiscordAdapter {
     client: Arc<Http>,
@@ -247,4 +247,33 @@ impl DiscordPort for DiscordAdapter {
 
         Ok(class_role_id)
     }
+
+    #[instrument(level = "debug", err, skip_all)]
+    async fn find_all_members(
+        &self,
+        offset: Option<UserId>,
+    ) -> Result<Option<Vec<UserId>>, DiscordError> {
+        let offset = offset.map(|offset| offset.0);
+
+        let members = self
+            .client
+            .get_guild_members(self.guild_id, None, offset)
+            .await
+            .map_err(map_serenity_error)?;
+        if members.is_empty() {
+            return Ok(None);
+        }
+
+        let member_ids = members
+            .into_iter()
+            .map(|m| serenity_to_domain_user_id(m.user.id))
+            .collect();
+        Ok(Some(member_ids))
+    }
+}
+
+#[instrument(level = "trace", skip_all)]
+fn map_serenity_error(err: serenity::Error) -> DiscordError {
+    error!("Serenity error: {}", err);
+    DiscordError::DiscordUnavailable
 }

@@ -44,6 +44,11 @@ pub trait DiscordPort {
     async fn find_role_name(&self, role_id: RoleId) -> Result<Option<String>, DiscordError>;
 
     async fn find_class_role(&self, class_id: &str) -> Result<Option<RoleId>, DiscordError>;
+
+    async fn find_all_members(
+        &self,
+        offset: Option<UserId>,
+    ) -> Result<Option<Vec<UserId>>, DiscordError>;
 }
 
 #[derive(Debug, Error)]

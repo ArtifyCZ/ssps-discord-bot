@@ -147,19 +147,23 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         user_info_sync_requested_repository.clone(),
     ));
     let user_adapter = Arc::new(UserService::new(
-        authenticated_user_repository,
-        role_sync_requested_repository,
-        user_info_sync_requested_repository,
+        authenticated_user_repository.clone(),
+        role_sync_requested_repository.clone(),
+        user_info_sync_requested_repository.clone(),
     ));
 
-    let locator = locator::ApplicationPortLocator::new(
+    let locator = locator::ApplicationPortLocator {
+        discord_adapter: discord_adapter.clone(),
+        authenticated_user_repository: authenticated_user_repository.clone(),
+        role_sync_requested_repository: role_sync_requested_repository.clone(),
+        user_info_sync_requested_repository: user_info_sync_requested_repository.clone(),
         authentication_adapter,
         information_channel_adapter,
         user_adapter,
         role_sync_job_handler_adapter,
         user_info_sync_job_handler_adapter,
-        serenity_client.clone(),
-    );
+        serenity_client: serenity_client.clone(),
+    };
 
     let api = tokio::spawn(run_api(locator.clone(), 8080));
     let bot = tokio::spawn(run_bot(locator.clone(), discord_bot_token, intents, guild));
