@@ -22,7 +22,10 @@ pub async fn run_user_info_sync_job_handler<L: Locator + Send + Sync + 'static>(
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         let error = match handler.tick().await {
-            Ok(()) => continue,
+            Ok(()) => {
+                unavailable_sleep_duration = None;
+                continue;
+            }
             Err(error) => error,
         };
 
