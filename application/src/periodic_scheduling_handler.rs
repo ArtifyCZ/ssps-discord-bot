@@ -15,17 +15,16 @@ use domain::jobs::user_info_sync_job::{
 use domain::ports::discord::{DiscordError, DiscordPort};
 use domain_shared::discord::UserId;
 use std::sync::Arc;
-use tracing::{error, instrument};
+use std::vec::IntoIter;
+use tracing::{error, info, instrument};
 
 pub struct PeriodicSchedulingHandler {
     discord_port: Arc<dyn DiscordPort + Send + Sync>,
     authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
     role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
     user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
-    authenticated_user_ids: Vec<UserId>,
-    authenticated_user_ids_idx: usize,
-    discord_members_chunk: Vec<UserId>,
-    discord_members_chunk_idx: usize,
+    authenticated_user_ids: IntoIter<UserId>,
+    discord_members_chunk: IntoIter<UserId>,
     discord_members_chunk_offset: Option<UserId>,
 }
 
@@ -42,10 +41,8 @@ impl PeriodicSchedulingHandler {
             authenticated_user_repository,
             role_sync_requested_repository,
             user_info_sync_requested_repository,
-            authenticated_user_ids: Vec::new(),
-            authenticated_user_ids_idx: 0,
-            discord_members_chunk: Vec::new(),
-            discord_members_chunk_idx: 0,
+            authenticated_user_ids: Vec::new().into_iter(),
+            discord_members_chunk: Vec::new().into_iter(),
             discord_members_chunk_offset: None,
         }
     }
@@ -74,6 +71,11 @@ impl PeriodicSchedulingHandler {
             }
         )?;
 
+        info!(
+            "Successfully produced periodic job requests for user {:?}",
+            user_id,
+        );
+
         Ok(())
     }
 
@@ -81,11 +83,20 @@ impl PeriodicSchedulingHandler {
     async fn retrieve_authenticated_users(
         &self,
     ) -> Result<Vec<UserId>, PeriodicSchedulingHandlerError> {
-        self.authenticated_user_repository
+        let users = self
+            .authenticated_user_repository
             .find_all()
             .await
-            .map_err(map_user_repo_err)
-            .map(|users| users.into_iter().map(|u| u.user_id()).collect())
+            .map_err(map_user_repo_err)?;
+
+        let user_ids = users.into_iter().map(|u| u.user_id()).collect();
+
+        info!(
+            "Successfully retrieved the list of authenticated users for periodic scheduling: {:?}",
+            user_ids
+        );
+
+        Ok(user_ids)
     }
 
     #[instrument(level = "debug", skip_all)]
@@ -99,6 +110,9 @@ impl PeriodicSchedulingHandler {
             .map_err(map_discord_err)?;
         if let Some(chunk) = chunk {
             let offset = chunk.last().copied();
+
+            info!("Successfully retrieved the list of discord members for periodic scheduling with new offset {:?}: {:?}", offset, chunk);
+
             Ok((chunk, offset))
         } else {
             Ok((Vec::new(), None))
@@ -110,28 +124,19 @@ impl PeriodicSchedulingHandler {
 impl PeriodicSchedulingHandlerPort for PeriodicSchedulingHandler {
     #[instrument(level = "debug", skip_all)]
     async fn tick(&mut self) -> Result<(), PeriodicSchedulingHandlerError> {
-        // Refresh the authenticated users list
-        if self.authenticated_user_ids.len() <= self.authenticated_user_ids_idx {
-            let users = self.retrieve_authenticated_users().await?;
-            self.authenticated_user_ids = users;
-            self.authenticated_user_ids_idx = 0;
+        if let Some(ref user_id) = self.authenticated_user_ids.next() {
+            self.produce_user_jobs(*user_id).await?;
+        } else {
+            self.authenticated_user_ids = self.retrieve_authenticated_users().await?.into_iter();
         }
 
-        // Refresh the Discord guild members list
-        if self.discord_members_chunk.len() <= self.discord_members_chunk_idx {
+        if let Some(ref user_id) = self.discord_members_chunk.next() {
+            self.produce_user_jobs(*user_id).await?;
+        } else {
             let (members_chunk, offset) = self.retrieve_discord_members().await?;
-            self.discord_members_chunk = members_chunk;
+            self.discord_members_chunk = members_chunk.into_iter();
             self.discord_members_chunk_offset = offset;
-            self.discord_members_chunk_idx = 0;
         }
-
-        self.produce_user_jobs(self.authenticated_user_ids[self.authenticated_user_ids_idx])
-            .await?;
-        self.authenticated_user_ids_idx += 1;
-
-        self.produce_user_jobs(self.discord_members_chunk[self.discord_members_chunk_idx])
-            .await?;
-        self.discord_members_chunk_idx += 1;
 
         Ok(())
     }
