@@ -10,7 +10,7 @@ pub async fn run_periodic_scheduling_worker<L: Locator + Send + Sync + 'static>(
     let mut handler = locator.create_periodic_scheduling_handler_port();
     let mut unavailable_sleep_duration: Option<Duration> = None;
     loop {
-        tokio::time::sleep(Duration::from_millis(1000)).await;
+        tokio::time::sleep(Duration::from_millis(3000)).await;
 
         let error = match handler.tick().await {
             Ok(()) => {
