@@ -26,42 +26,15 @@ use std::sync::Arc;
 use tracing::{error, info, instrument, warn, Span};
 
 pub struct AuthenticationService {
-    oauth_port: Arc<dyn OAuthPort + Send + Sync>,
-    archived_authenticated_user_repository:
+    pub oauth_port: Arc<dyn OAuthPort + Send + Sync>,
+    pub archived_authenticated_user_repository:
         Arc<dyn ArchivedAuthenticatedUserRepository + Send + Sync>,
-    authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
-    user_authentication_request_repository:
+    pub authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
+    pub user_authentication_request_repository:
         Arc<dyn UserAuthenticationRequestRepository + Send + Sync>,
-    user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
-    role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
-    invite_link: InviteLink,
-}
-
-impl AuthenticationService {
-    #[instrument(level = "trace", skip_all)]
-    pub fn new(
-        oauth_port: Arc<dyn OAuthPort + Send + Sync>,
-        archived_authenticated_user_repository: Arc<
-            dyn ArchivedAuthenticatedUserRepository + Send + Sync,
-        >,
-        authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
-        user_authentication_request_repository: Arc<
-            dyn UserAuthenticationRequestRepository + Send + Sync,
-        >,
-        user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
-        role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
-        invite_link: InviteLink,
-    ) -> Self {
-        Self {
-            oauth_port,
-            archived_authenticated_user_repository,
-            authenticated_user_repository,
-            user_info_sync_requested_repository,
-            user_authentication_request_repository,
-            role_sync_requested_repository,
-            invite_link,
-        }
-    }
+    pub user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
+    pub role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
+    pub invite_link: InviteLink,
 }
 
 #[async_trait]

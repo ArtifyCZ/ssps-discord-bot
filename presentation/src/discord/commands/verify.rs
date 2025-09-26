@@ -1,6 +1,7 @@
 use crate::application_ports::Locator;
 use crate::discord::{response, Context, Error};
 use application_ports::authentication::AuthenticationError;
+use application_ports::authentication::AuthenticationPort;
 use domain_shared::discord::UserId;
 use tracing::{error, info, instrument};
 
@@ -18,7 +19,7 @@ pub async fn command<D: Sync + Locator>(ctx: Context<'_, D>) -> Result<(), Error
         "Creating authentication link",
     );
 
-    let authentication_port = ctx.data().get_authentication_port();
+    let authentication_port = ctx.data().create_authentication_port();
 
     let user = ctx.author();
 

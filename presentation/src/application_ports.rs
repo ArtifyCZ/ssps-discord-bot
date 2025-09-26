@@ -7,12 +7,12 @@ use application_ports::user_info_sync_job_handler::UserInfoSyncJobHandlerPort;
 use poise::serenity_prelude as serenity;
 
 pub trait Locator {
+    fn create_authentication_port(&self) -> impl AuthenticationPort + Send + Sync;
     fn create_periodic_scheduling_handler_port(
         &self,
     ) -> impl PeriodicSchedulingHandlerPort + Send + Sync;
     fn create_role_sync_job_handler_port(&self) -> impl RoleSyncJobHandlerPort + Send + Sync;
 
-    fn get_authentication_port(&self) -> &(dyn AuthenticationPort + Send + Sync);
     fn get_information_channel_port(&self) -> &(dyn InformationChannelPort + Send + Sync);
     fn get_user_port(&self) -> &(dyn UserPort + Send + Sync);
     fn get_role_sync_job_handler_port(&self) -> &(dyn RoleSyncJobHandlerPort + Send + Sync);

@@ -10,11 +10,14 @@ use application_ports::periodic_scheduling_handler::PeriodicSchedulingHandlerPor
 use application_ports::role_sync_job_handler::RoleSyncJobHandlerPort;
 use application_ports::user::UserPort;
 use application_ports::user_info_sync_job_handler::UserInfoSyncJobHandlerPort;
-use domain_shared::discord::RoleId;
+use domain_shared::discord::{InviteLink, RoleId};
+use infrastructure::authentication::archived_authenticated_user::PostgresArchivedAuthenticatedUserRepository;
 use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUserRepository;
+use infrastructure::authentication::user_authentication_request::PostgresUserAuthenticationRequestRepository;
 use infrastructure::discord::DiscordAdapter;
 use infrastructure::jobs::role_sync_job_repository::PostgresRoleSyncRequestedRepository;
 use infrastructure::jobs::user_info_sync_job_repository::PostgresUserInfoSyncRequestedRepository;
+use infrastructure::oauth::OAuthAdapter;
 use presentation::application_ports::Locator;
 use std::sync::Arc;
 use tracing::instrument;
@@ -24,13 +27,18 @@ pub struct ApplicationPortLocator {
     pub(crate) everyone_roles: Vec<RoleId>,
     pub(crate) additional_student_roles: Vec<RoleId>,
     pub(crate) unknown_class_role_id: RoleId,
+    pub(crate) invite_link: InviteLink,
 
     pub(crate) discord_adapter: Arc<DiscordAdapter>,
+    pub(crate) oauth_adapter: Arc<OAuthAdapter>,
     pub(crate) authenticated_user_repository: Arc<PostgresAuthenticatedUserRepository>,
+    pub(crate) archived_authenticated_user_repository:
+        Arc<PostgresArchivedAuthenticatedUserRepository>,
     pub(crate) role_sync_requested_repository: Arc<PostgresRoleSyncRequestedRepository>,
+    pub(crate) user_authentication_request_repository:
+        Arc<PostgresUserAuthenticationRequestRepository>,
     pub(crate) user_info_sync_requested_repository: Arc<PostgresUserInfoSyncRequestedRepository>,
 
-    pub(crate) authentication_adapter: Arc<AuthenticationService>,
     pub(crate) information_channel_adapter: Arc<InformationChannelService>,
     pub(crate) user_adapter: Arc<UserService>,
     pub(crate) role_sync_job_handler_adapter: Arc<RoleSyncJobHandler>,
@@ -39,6 +47,23 @@ pub struct ApplicationPortLocator {
 }
 
 impl Locator for ApplicationPortLocator {
+    #[instrument(level = "trace", skip(self))]
+    fn create_authentication_port(&self) -> impl AuthenticationPort + Send + Sync {
+        AuthenticationService {
+            oauth_port: self.oauth_adapter.clone(),
+            archived_authenticated_user_repository: self
+                .archived_authenticated_user_repository
+                .clone(),
+            authenticated_user_repository: self.authenticated_user_repository.clone(),
+            user_authentication_request_repository: self
+                .user_authentication_request_repository
+                .clone(),
+            user_info_sync_requested_repository: self.user_info_sync_requested_repository.clone(),
+            role_sync_requested_repository: self.role_sync_requested_repository.clone(),
+            invite_link: self.invite_link.clone(),
+        }
+    }
+
     #[instrument(level = "trace", skip(self))]
     fn create_periodic_scheduling_handler_port(&self) -> impl PeriodicSchedulingHandlerPort {
         PeriodicSchedulingHandler::new(
@@ -59,11 +84,6 @@ impl Locator for ApplicationPortLocator {
             self.additional_student_roles.clone(),
             self.unknown_class_role_id,
         )
-    }
-
-    #[instrument(level = "trace", skip(self))]
-    fn get_authentication_port(&self) -> &(dyn AuthenticationPort + Send + Sync) {
-        &*self.authentication_adapter
     }
 
     #[instrument(level = "trace", skip(self))]
