@@ -10,6 +10,7 @@ use application_ports::periodic_scheduling_handler::PeriodicSchedulingHandlerPor
 use application_ports::role_sync_job_handler::RoleSyncJobHandlerPort;
 use application_ports::user::UserPort;
 use application_ports::user_info_sync_job_handler::UserInfoSyncJobHandlerPort;
+use domain_shared::discord::RoleId;
 use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUserRepository;
 use infrastructure::discord::DiscordAdapter;
 use infrastructure::jobs::role_sync_job_repository::PostgresRoleSyncRequestedRepository;
@@ -20,6 +21,10 @@ use tracing::instrument;
 
 #[derive(Clone)]
 pub struct ApplicationPortLocator {
+    pub(crate) everyone_roles: Vec<RoleId>,
+    pub(crate) additional_student_roles: Vec<RoleId>,
+    pub(crate) unknown_class_role_id: RoleId,
+
     pub(crate) discord_adapter: Arc<DiscordAdapter>,
     pub(crate) authenticated_user_repository: Arc<PostgresAuthenticatedUserRepository>,
     pub(crate) role_sync_requested_repository: Arc<PostgresRoleSyncRequestedRepository>,
@@ -41,6 +46,18 @@ impl Locator for ApplicationPortLocator {
             self.authenticated_user_repository.clone(),
             self.role_sync_requested_repository.clone(),
             self.user_info_sync_requested_repository.clone(),
+        )
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    fn create_role_sync_job_handler_port(&self) -> impl RoleSyncJobHandlerPort + Send + Sync {
+        RoleSyncJobHandler::new(
+            self.discord_adapter.clone(),
+            self.authenticated_user_repository.clone(),
+            self.role_sync_requested_repository.clone(),
+            self.everyone_roles.clone(),
+            self.additional_student_roles.clone(),
+            self.unknown_class_role_id,
         )
     }
 

@@ -2,17 +2,16 @@ use application_ports::role_sync_job_handler::{RoleSyncJobHandlerError, RoleSync
 use async_trait::async_trait;
 use chrono::{Duration, TimeDelta};
 use domain::authentication::authenticated_user::{
-    AuthenticatedUser, AuthenticatedUserRepository, AuthenticatedUserRepositoryError,
+    AuthenticatedUserRepository, AuthenticatedUserRepositoryError,
 };
 use domain::authentication::create_class_ids;
 use domain::jobs::role_sync_job::{
     RoleSyncRequested, RoleSyncRequestedRepository, RoleSyncRequestedRepositoryError,
 };
-use domain::ports::discord::{DiscordError, DiscordPort, Role, RoleDiff};
-use domain::roles::{diff_additional_student_roles, diff_class_roles, diff_everyone_roles};
+use domain::ports::discord::{DiscordError, DiscordPort};
+use domain::roles::RolesDiffService;
 use domain_shared::discord::RoleId;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tracing::{error, info, instrument};
 
 pub struct RoleSyncJobHandler {
@@ -22,7 +21,7 @@ pub struct RoleSyncJobHandler {
     everyone_roles: Vec<RoleId>,
     additional_student_roles: Vec<RoleId>,
     class_ids: Vec<String>,
-    class_id_to_role_id: Mutex<Option<Vec<(String, RoleId)>>>,
+    roles_diff_service: Option<RolesDiffService>,
     unknown_class_role_id: RoleId,
 }
 
@@ -37,7 +36,6 @@ impl RoleSyncJobHandler {
         unknown_class_role_id: RoleId,
     ) -> Self {
         let class_ids = create_class_ids();
-        let class_id_to_role_id = Mutex::new(None);
 
         Self {
             discord_port,
@@ -46,13 +44,13 @@ impl RoleSyncJobHandler {
             everyone_roles,
             additional_student_roles,
             class_ids,
-            class_id_to_role_id,
+            roles_diff_service: None,
             unknown_class_role_id,
         }
     }
 
     #[instrument(level = "info", skip(self))]
-    async fn handle(&self, request: RoleSyncRequested) -> Result<(), RoleSyncJobHandlerError> {
+    async fn handle(&mut self, request: RoleSyncRequested) -> Result<(), RoleSyncJobHandlerError> {
         const MIN_DURATION_SINCE_QUEUED: TimeDelta = Duration::milliseconds(400);
         const WAIT_TICK_DURATION: TimeDelta = Duration::milliseconds(100);
         let can_sync_since = request.queued_at + MIN_DURATION_SINCE_QUEUED;
@@ -64,28 +62,33 @@ impl RoleSyncJobHandler {
             tokio::time::sleep(WAIT_TICK_DURATION.to_std().unwrap()).await;
         }
 
-        let (class_id_to_role_id, assigned_roles, user) = tokio::try_join!(
-            async move { self.get_or_create_class_id_to_role_id().await },
-            async move {
+        if self.roles_diff_service.is_none() {
+            let roles_diff_service = self.create_roles_diff_service().await?;
+            self.roles_diff_service = Some(roles_diff_service);
+        }
+        let roles_diff_service = self.roles_diff_service.as_ref().ok_or_else(|| {
+            error!("Unreachable: roles_diff_service is None, but it should be Some at this point");
+            RoleSyncJobHandlerError::TemporaryUnavailable
+        })?;
+
+        let (assigned_roles, user) = tokio::try_join!(
+            async {
                 self.discord_port
                     .find_user_roles(request.user_id)
                     .await
                     .map_err(map_discord_err)
             },
-            async move {
+            async {
                 self.authenticated_user_repository
                     .find_by_user_id(request.user_id)
                     .await
                     .map_err(map_user_repo_err)
             }
         )?;
+        let assigned_roles = assigned_roles.iter().map(|r| r.role_id).collect::<Vec<_>>();
 
-        let role_diff = match user {
-            None => self.handle_unauthenticated_user(&assigned_roles, &class_id_to_role_id),
-            Some(user) => {
-                self.handle_authenticated_user(&user, &assigned_roles, &class_id_to_role_id)
-            }
-        }?;
+        let mut role_diff = roles_diff_service.diff_roles(user.as_ref());
+        role_diff.optimize_by_already_assigned_roles(&assigned_roles);
 
         self.discord_port
             .apply_role_diff(request.user_id, &role_diff, "Role sync job handler")
@@ -101,57 +104,7 @@ impl RoleSyncJobHandler {
     }
 
     #[instrument(level = "trace", skip(self))]
-    fn handle_unauthenticated_user(
-        &self,
-        assigned_roles: &Vec<Role>,
-        class_id_to_role_id: &Vec<(String, RoleId)>,
-    ) -> Result<RoleDiff, RoleSyncJobHandlerError> {
-        let mut diff = RoleDiff::default();
-
-        diff += diff_everyone_roles(&self.everyone_roles, assigned_roles);
-        diff +=
-            diff_additional_student_roles(&self.additional_student_roles, assigned_roles, false);
-        diff += diff_class_roles(
-            self.unknown_class_role_id,
-            &self.class_ids,
-            class_id_to_role_id,
-            None,
-            assigned_roles,
-        );
-
-        Ok(diff)
-    }
-
-    #[instrument(level = "trace", skip(self))]
-    fn handle_authenticated_user(
-        &self,
-        user: &AuthenticatedUser,
-        assigned_roles: &Vec<Role>,
-        class_id_to_role_id: &Vec<(String, RoleId)>,
-    ) -> Result<RoleDiff, RoleSyncJobHandlerError> {
-        let mut diff = RoleDiff::default();
-
-        diff += diff_everyone_roles(&self.everyone_roles, assigned_roles);
-        diff += diff_additional_student_roles(&self.additional_student_roles, assigned_roles, true);
-        diff += diff_class_roles(
-            self.unknown_class_role_id,
-            &self.class_ids,
-            class_id_to_role_id,
-            Some(user),
-            assigned_roles,
-        );
-
-        Ok(diff)
-    }
-
-    #[instrument(level = "trace", skip(self))]
-    async fn get_or_create_class_id_to_role_id(
-        &self,
-    ) -> Result<Vec<(String, RoleId)>, RoleSyncJobHandlerError> {
-        let mut class_id_to_role_id_guard = self.class_id_to_role_id.lock().await;
-        if let Some(class_id_to_role_id) = &*class_id_to_role_id_guard {
-            return Ok(class_id_to_role_id.clone());
-        }
+    async fn create_roles_diff_service(&self) -> Result<RolesDiffService, RoleSyncJobHandlerError> {
         let mut class_id_to_role_id = Vec::new();
 
         for class_id in &self.class_ids {
@@ -163,16 +116,20 @@ impl RoleSyncJobHandler {
             class_id_to_role_id.push((class_id.to_string(), role.role_id));
         }
 
-        *class_id_to_role_id_guard = Some(class_id_to_role_id.clone());
-
-        Ok(class_id_to_role_id)
+        Ok(RolesDiffService {
+            everyone_roles: self.everyone_roles.clone(),
+            additional_student_roles: self.additional_student_roles.clone(),
+            unknown_class_role_id: self.unknown_class_role_id,
+            class_ids: self.class_ids.clone(),
+            class_id_to_role_id,
+        })
     }
 }
 
 #[async_trait]
 impl RoleSyncJobHandlerPort for RoleSyncJobHandler {
     #[instrument(level = "debug", skip_all)]
-    async fn tick(&self) -> Result<(), RoleSyncJobHandlerError> {
+    async fn tick(&mut self) -> Result<(), RoleSyncJobHandlerError> {
         let high_priority = self
             .role_sync_requested_repository
             .pop_oldest(false)

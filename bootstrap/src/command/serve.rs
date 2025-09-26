@@ -144,8 +144,8 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         discord_adapter.clone(),
         authenticated_user_repository.clone(),
         role_sync_requested_repository.clone(),
-        everyone_roles,
-        additional_student_roles,
+        everyone_roles.clone(),
+        additional_student_roles.clone(),
         unknown_class_role_id,
     ));
     let user_info_sync_job_handler_adapter = Arc::new(UserInfoSyncJobHandler::new(
@@ -161,6 +161,10 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
     ));
 
     let locator = locator::ApplicationPortLocator {
+        everyone_roles: everyone_roles.clone(),
+        additional_student_roles: additional_student_roles.clone(),
+        unknown_class_role_id,
+
         discord_adapter: discord_adapter.clone(),
         authenticated_user_repository: authenticated_user_repository.clone(),
         role_sync_requested_repository: role_sync_requested_repository.clone(),

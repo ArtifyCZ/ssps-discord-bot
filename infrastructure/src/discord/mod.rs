@@ -110,7 +110,7 @@ impl DiscordPort for DiscordAdapter {
         let user_id = domain_to_serenity_user_id(user_id);
         let mut set = JoinSet::new();
 
-        for role_id in &role_diff.to_assign {
+        for role_id in role_diff.to_assign() {
             let role_id = domain_to_serenity_role_id(*role_id);
             let guild_id = self.guild_id;
             let client = self.client.clone();
@@ -123,7 +123,7 @@ impl DiscordPort for DiscordAdapter {
             });
         }
 
-        for role_id in &role_diff.to_remove {
+        for role_id in role_diff.to_remove() {
             let role_id = domain_to_serenity_role_id(*role_id);
             let guild_id = self.guild_id;
             let client = self.client.clone();

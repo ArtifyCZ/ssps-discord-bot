@@ -4,7 +4,7 @@ use tracing::error;
 
 #[async_trait]
 pub trait RoleSyncJobHandlerPort {
-    async fn tick(&self) -> Result<(), RoleSyncJobHandlerError>;
+    async fn tick(&mut self) -> Result<(), RoleSyncJobHandlerError>;
 }
 
 #[derive(Debug, Error)]

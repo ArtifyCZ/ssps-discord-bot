@@ -10,6 +10,7 @@ pub trait Locator {
     fn create_periodic_scheduling_handler_port(
         &self,
     ) -> impl PeriodicSchedulingHandlerPort + Send + Sync;
+    fn create_role_sync_job_handler_port(&self) -> impl RoleSyncJobHandlerPort + Send + Sync;
 
     fn get_authentication_port(&self) -> &(dyn AuthenticationPort + Send + Sync);
     fn get_information_channel_port(&self) -> &(dyn InformationChannelPort + Send + Sync);

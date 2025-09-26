@@ -1,5 +1,6 @@
 use crate::application_ports::Locator;
 use application_ports::role_sync_job_handler::RoleSyncJobHandlerError;
+use application_ports::role_sync_job_handler::RoleSyncJobHandlerPort;
 use std::time::Duration;
 use tracing::{error, instrument, warn};
 
@@ -8,7 +9,7 @@ pub async fn run_role_sync_job_handler<L: Locator + Send + Sync + 'static>(
     locator: L,
     mut wake_channel: tokio::sync::mpsc::Receiver<()>,
 ) {
-    let handler = locator.get_role_sync_job_handler_port();
+    let mut handler = locator.create_role_sync_job_handler_port();
     let mut unavailable_sleep_duration: Option<Duration> = None;
     loop {
         loop {
