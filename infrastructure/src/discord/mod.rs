@@ -70,13 +70,7 @@ impl DiscordPort for DiscordAdapter {
             .client
             .get_guild_roles(self.guild_id)
             .await
-            .map_err(|err| {
-                warn!(
-                    "Failed to fetch roles from guild {}: {}",
-                    self.guild_id, err,
-                );
-                DiscordError::DiscordUnavailable
-            })?;
+            .map_err(map_serenity_err)?;
 
         for role in roles {
             if role.name.eq_ignore_ascii_case(role_name) {
@@ -98,10 +92,7 @@ impl DiscordPort for DiscordAdapter {
                 Some(reason),
             )
             .await
-            .map_err(|err| {
-                warn!("Failed to create role {}: {}", role_name, err);
-                DiscordError::DiscordUnavailable
-            })?;
+            .map_err(map_serenity_err)?;
 
         Ok(Role {
             role_id: serenity_to_domain_role_id(role.id),
@@ -148,7 +139,11 @@ impl DiscordPort for DiscordAdapter {
         let mut failed = false;
         for result in set.join_all().await {
             if let Err(err) = result {
-                warn!("Failed to apply role diff to user {}: {}", user_id, err,);
+                error!(
+                    "An error occurred during role diff of user {:?}: {:?}",
+                    user_id,
+                    map_serenity_err(err)
+                );
                 failed = true;
             }
         }
@@ -169,13 +164,7 @@ impl DiscordPort for DiscordAdapter {
             .client
             .get_member(self.guild_id, user_id)
             .await
-            .map_err(|err| {
-                warn!(
-                    "Failed to fetch member {} from guild {}: {}",
-                    user_id, self.guild_id, err,
-                );
-                DiscordError::DiscordUnavailable
-            })?;
+            .map_err(map_serenity_err)?;
 
         for role_id in member.roles.iter() {
             let role_id = *role_id;
@@ -215,13 +204,7 @@ impl DiscordPort for DiscordAdapter {
             .client
             .get_guild_role(self.guild_id, role_id)
             .await
-            .map_err(|err| {
-                warn!(
-                    "Failed to fetch role {} from guild {}: {}",
-                    role_id, self.guild_id, err,
-                );
-                DiscordError::DiscordUnavailable
-            })?;
+            .map_err(map_serenity_err)?;
 
         Ok(Some(role.name))
     }
@@ -232,13 +215,7 @@ impl DiscordPort for DiscordAdapter {
             .client
             .get_guild_roles(self.guild_id)
             .await
-            .map_err(|err| {
-                warn!(
-                    "Failed to fetch roles from guild {}: {}",
-                    self.guild_id, err,
-                );
-                DiscordError::DiscordUnavailable
-            })?;
+            .map_err(map_serenity_err)?;
 
         let class_role = roles
             .iter()
@@ -259,7 +236,7 @@ impl DiscordPort for DiscordAdapter {
             .client
             .get_guild_members(self.guild_id, None, offset)
             .await
-            .map_err(map_serenity_error)?;
+            .map_err(map_serenity_err)?;
         if members.is_empty() {
             return Ok(None);
         }
@@ -273,7 +250,7 @@ impl DiscordPort for DiscordAdapter {
 }
 
 #[instrument(level = "trace", skip_all)]
-fn map_serenity_error(err: serenity::Error) -> DiscordError {
-    error!("Serenity error: {}", err);
+fn map_serenity_err(err: serenity::Error) -> DiscordError {
+    error!("Serenity error occurred: {:?}", err);
     DiscordError::DiscordUnavailable
 }
