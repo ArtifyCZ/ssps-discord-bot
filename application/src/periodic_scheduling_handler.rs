@@ -89,11 +89,12 @@ impl PeriodicSchedulingHandler {
             .await
             .map_err(map_user_repo_err)?;
 
-        let user_ids = users.into_iter().map(|u| u.user_id()).collect();
+        let user_ids: Vec<UserId> = users.into_iter().map(|u| u.user_id()).collect();
 
+        let user_ids_sample = &user_ids[0..user_ids.len().min(6)];
         info!(
-            "Successfully retrieved the list of authenticated users for periodic scheduling: {:?}",
-            user_ids
+            "Successfully retrieved the list of authenticated users for periodic scheduling: sample(0..6): {:?}",
+            user_ids_sample,
         );
 
         Ok(user_ids)
