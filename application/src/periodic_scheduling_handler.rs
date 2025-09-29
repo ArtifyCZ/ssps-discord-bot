@@ -111,7 +111,8 @@ impl PeriodicSchedulingHandler {
         if let Some(chunk) = chunk {
             let offset = chunk.last().copied();
 
-            info!("Successfully retrieved the list of discord members for periodic scheduling with new offset {:?}: {:?}", offset, chunk);
+            let chunk_sample = &chunk[0..chunk.len().min(6)];
+            info!("Successfully retrieved the list of discord members for periodic scheduling with new offset {:?}: sample(0..6): {:?}", offset, chunk_sample);
 
             Ok((chunk, offset))
         } else {
