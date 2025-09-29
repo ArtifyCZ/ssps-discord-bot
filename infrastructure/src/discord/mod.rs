@@ -156,15 +156,23 @@ impl DiscordPort for DiscordAdapter {
     }
 
     #[instrument(level = "debug", err, skip_all)]
-    async fn find_user_roles(&self, user_id: UserId) -> Result<Vec<Role>, DiscordError> {
+    async fn find_user_roles(&self, user_id: UserId) -> Result<Option<Vec<Role>>, DiscordError> {
         let user_id = domain_to_serenity_user_id(user_id);
         let mut set = JoinSet::new();
 
-        let member = self
-            .client
-            .get_member(self.guild_id, user_id)
-            .await
-            .map_err(map_serenity_err)?;
+        let member = match self.client.get_member(self.guild_id, user_id).await {
+            Ok(member) => member,
+            Err(err) => {
+                if let serenity::Error::Http(serenity::http::HttpError::UnsuccessfulRequest(err)) =
+                    &err
+                {
+                    if err.status_code == 404 {
+                        return Ok(None);
+                    }
+                }
+                return Err(map_serenity_err(err));
+            }
+        };
 
         for role_id in member.roles.iter() {
             let role_id = *role_id;
@@ -193,7 +201,7 @@ impl DiscordPort for DiscordAdapter {
             roles.push(role?);
         }
 
-        Ok(roles)
+        Ok(Some(roles))
     }
 
     #[instrument(level = "debug", err, skip_all)]

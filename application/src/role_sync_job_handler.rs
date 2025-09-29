@@ -85,6 +85,11 @@ impl RoleSyncJobHandler {
                     .map_err(map_user_repo_err)
             }
         )?;
+        let assigned_roles = match assigned_roles {
+            None => return Ok(()), // User not found on the guild, nothing to do
+            Some(assigned_roles) => assigned_roles,
+        };
+
         let assigned_roles = assigned_roles.iter().map(|r| r.role_id).collect::<Vec<_>>();
 
         let mut role_diff = roles_diff_service.diff_roles(user.as_ref());

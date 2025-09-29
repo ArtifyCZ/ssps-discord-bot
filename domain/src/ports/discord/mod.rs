@@ -39,7 +39,7 @@ pub trait DiscordPort {
         reason: &str,
     ) -> Result<(), DiscordError>;
 
-    async fn find_user_roles(&self, user_id: UserId) -> Result<Vec<Role>, DiscordError>;
+    async fn find_user_roles(&self, user_id: UserId) -> Result<Option<Vec<Role>>, DiscordError>;
 
     async fn find_role_name(&self, role_id: RoleId) -> Result<Option<String>, DiscordError>;
 
