@@ -99,11 +99,6 @@ impl Locator for ApplicationPortLocator {
     }
 
     #[instrument(level = "trace", skip(self))]
-    fn get_role_sync_job_handler_port(&self) -> &(dyn RoleSyncJobHandlerPort + Send + Sync) {
-        &*self.role_sync_job_handler_adapter
-    }
-
-    #[instrument(level = "trace", skip(self))]
     fn get_user_info_sync_job_handler_port(
         &self,
     ) -> &(dyn UserInfoSyncJobHandlerPort + Send + Sync) {

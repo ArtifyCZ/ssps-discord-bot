@@ -15,7 +15,6 @@ pub trait Locator {
     fn create_information_channel_port(&self) -> impl InformationChannelPort + Send + Sync;
     fn create_user_port(&self) -> impl UserPort + Send + Sync;
 
-    fn get_role_sync_job_handler_port(&self) -> &(dyn RoleSyncJobHandlerPort + Send + Sync);
     fn get_user_info_sync_job_handler_port(
         &self,
     ) -> &(dyn UserInfoSyncJobHandlerPort + Send + Sync);
