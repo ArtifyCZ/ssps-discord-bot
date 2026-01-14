@@ -18,9 +18,9 @@ use std::sync::Arc;
 use std::vec::IntoIter;
 use tracing::{error, info, instrument};
 
-pub struct PeriodicSchedulingHandler {
+pub struct PeriodicSchedulingHandler<TAuthenticatedUserRepository> {
     discord_port: Arc<dyn DiscordPort + Send + Sync>,
-    authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
+    authenticated_user_repository: TAuthenticatedUserRepository,
     role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
     user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
     authenticated_user_ids: IntoIter<UserId>,
@@ -28,11 +28,14 @@ pub struct PeriodicSchedulingHandler {
     discord_members_chunk_offset: Option<UserId>,
 }
 
-impl PeriodicSchedulingHandler {
+impl<TAuthenticatedUserRepository> PeriodicSchedulingHandler<TAuthenticatedUserRepository>
+where
+    TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+{
     #[instrument(level = "trace", skip_all)]
     pub fn new(
         discord_port: Arc<dyn DiscordPort + Send + Sync>,
-        authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
+        authenticated_user_repository: TAuthenticatedUserRepository,
         role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
         user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
     ) -> Self {
@@ -123,7 +126,11 @@ impl PeriodicSchedulingHandler {
 }
 
 #[async_trait]
-impl PeriodicSchedulingHandlerPort for PeriodicSchedulingHandler {
+impl<TAuthenticatedUserRepository> PeriodicSchedulingHandlerPort
+    for PeriodicSchedulingHandler<TAuthenticatedUserRepository>
+where
+    TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+{
     #[instrument(level = "debug", skip_all)]
     async fn tick(&mut self) -> Result<(), PeriodicSchedulingHandlerError> {
         if let Some(ref user_id) = self.authenticated_user_ids.next() {

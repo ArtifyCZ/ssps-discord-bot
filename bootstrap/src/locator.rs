@@ -45,10 +45,15 @@ pub struct ApplicationPortLocator {
 
 impl ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
-    fn authenticated_user_repository(&self) -> Arc<impl AuthenticatedUserRepository + Send + Sync> {
-        Arc::new(PostgresAuthenticatedUserRepository::new(
-            self.postgres_pool.clone(),
-        ))
+    fn authenticated_user_repository(&self) -> impl AuthenticatedUserRepository + Send + Sync {
+        PostgresAuthenticatedUserRepository::new(self.postgres_pool.clone())
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    fn authenticated_user_repository_arc(
+        &self,
+    ) -> Arc<impl AuthenticatedUserRepository + Send + Sync> {
+        Arc::new(self.authenticated_user_repository())
     }
 
     #[instrument(level = "trace", skip(self))]
@@ -80,7 +85,7 @@ impl Locator for ApplicationPortLocator {
         AuthenticationService {
             oauth_port: self.oauth_adapter.clone(),
             archived_authenticated_user_repository: self.archived_authenticated_user_repository(),
-            authenticated_user_repository: self.authenticated_user_repository(),
+            authenticated_user_repository: self.authenticated_user_repository_arc(),
             user_authentication_request_repository: self.user_authentication_request_repository(),
             user_info_sync_requested_repository: self.user_info_sync_requested_repository.clone(),
             role_sync_requested_repository: self.role_sync_requested_repository.clone(),
@@ -102,7 +107,7 @@ impl Locator for ApplicationPortLocator {
     fn create_role_sync_job_handler_port(&self) -> impl RoleSyncJobHandlerPort + Send + Sync {
         RoleSyncJobHandler::new(
             self.discord_adapter(),
-            self.authenticated_user_repository(),
+            self.authenticated_user_repository_arc(),
             self.role_sync_requested_repository.clone(),
             self.everyone_roles.clone(),
             self.additional_student_roles.clone(),
@@ -116,7 +121,7 @@ impl Locator for ApplicationPortLocator {
     ) -> impl UserInfoSyncJobHandlerPort + Send + Sync {
         UserInfoSyncJobHandler::new(
             self.oauth_adapter.clone(),
-            self.authenticated_user_repository(),
+            self.authenticated_user_repository_arc(),
             self.role_sync_requested_repository.clone(),
             self.user_info_sync_requested_repository.clone(),
         )
@@ -130,7 +135,7 @@ impl Locator for ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
     fn create_user_port(&self) -> impl UserPort + Send + Sync {
         UserService::new(
-            self.authenticated_user_repository(),
+            self.authenticated_user_repository_arc(),
             self.role_sync_requested_repository.clone(),
             self.user_info_sync_requested_repository.clone(),
         )
