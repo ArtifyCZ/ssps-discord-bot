@@ -12,6 +12,7 @@ use application_ports::user::UserPort;
 use application_ports::user_info_sync_job_handler::UserInfoSyncJobHandlerPort;
 use domain::authentication::archived_authenticated_user::ArchivedAuthenticatedUserRepository;
 use domain::authentication::authenticated_user::AuthenticatedUserRepository;
+use domain::authentication::user_authentication_request::UserAuthenticationRequestRepository;
 use domain::ports::discord::DiscordPort;
 use domain_shared::discord::{InviteLink, RoleId};
 use infrastructure::authentication::archived_authenticated_user::PostgresArchivedAuthenticatedUserRepository;
@@ -36,8 +37,6 @@ pub struct ApplicationPortLocator {
 
     pub(crate) oauth_adapter: Arc<OAuthAdapter>,
     pub(crate) role_sync_requested_repository: Arc<PostgresRoleSyncRequestedRepository>,
-    pub(crate) user_authentication_request_repository:
-        Arc<PostgresUserAuthenticationRequestRepository>,
     pub(crate) user_info_sync_requested_repository: Arc<PostgresUserInfoSyncRequestedRepository>,
 
     pub(crate) postgres_pool: sqlx::PgPool,
@@ -62,6 +61,15 @@ impl ApplicationPortLocator {
     }
 
     #[instrument(level = "trace", skip(self))]
+    fn user_authentication_request_repository(
+        &self,
+    ) -> Arc<impl UserAuthenticationRequestRepository + Send + Sync> {
+        Arc::new(PostgresUserAuthenticationRequestRepository::new(
+            self.postgres_pool.clone(),
+        ))
+    }
+
+    #[instrument(level = "trace", skip(self))]
     fn discord_adapter(&self) -> Arc<impl DiscordPort + Send + Sync> {
         Arc::new(DiscordAdapter::new(
             self.serenity_client.clone(),
@@ -77,9 +85,7 @@ impl Locator for ApplicationPortLocator {
             oauth_port: self.oauth_adapter.clone(),
             archived_authenticated_user_repository: self.archived_authenticated_user_repository(),
             authenticated_user_repository: self.authenticated_user_repository(),
-            user_authentication_request_repository: self
-                .user_authentication_request_repository
-                .clone(),
+            user_authentication_request_repository: self.user_authentication_request_repository(),
             user_info_sync_requested_repository: self.user_info_sync_requested_repository.clone(),
             role_sync_requested_repository: self.role_sync_requested_repository.clone(),
             invite_link: self.invite_link.clone(),

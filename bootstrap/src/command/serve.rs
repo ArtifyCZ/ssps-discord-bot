@@ -11,7 +11,6 @@ use std::sync::Arc;
 use url::Url;
 
 use crate::args::CommonArgs;
-use infrastructure::authentication::user_authentication_request::PostgresUserAuthenticationRequestRepository;
 use infrastructure::jobs::role_sync_job_repository::PostgresRoleSyncRequestedRepository;
 use infrastructure::jobs::user_info_sync_job_repository::PostgresUserInfoSyncRequestedRepository;
 use poise::serenity_prelude as serenity;
@@ -99,9 +98,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
     let serenity_client = ClientBuilder::new(&discord_bot_token, intents).await?.http;
 
     let oauth_adapter = Arc::new(OAuthAdapter::new(oauth_adapter_config));
-    let user_authentication_request_repository = Arc::new(
-        PostgresUserAuthenticationRequestRepository::new(database_connection.clone()),
-    );
     let (role_sync_job_wake_tx, role_sync_job_wake_rx) = tokio::sync::mpsc::channel(24);
     let role_sync_requested_repository = Arc::new(PostgresRoleSyncRequestedRepository::new(
         database_connection.clone(),
@@ -123,7 +119,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
 
         oauth_adapter: oauth_adapter.clone(),
         role_sync_requested_repository: role_sync_requested_repository.clone(),
-        user_authentication_request_repository: user_authentication_request_repository.clone(),
         user_info_sync_requested_repository: user_info_sync_requested_repository.clone(),
 
         postgres_pool: database_connection,
