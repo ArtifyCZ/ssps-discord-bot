@@ -67,11 +67,6 @@ impl ApplicationPortLocator {
     fn discord_adapter(&self) -> impl DiscordPort + Send + Sync {
         DiscordAdapter::new(self.serenity_client.clone(), self.guild_id)
     }
-
-    #[instrument(level = "trace", skip(self))]
-    fn discord_adapter_arc(&self) -> Arc<impl DiscordPort + Send + Sync> {
-        Arc::new(self.discord_adapter())
-    }
 }
 
 impl Locator for ApplicationPortLocator {
@@ -124,7 +119,7 @@ impl Locator for ApplicationPortLocator {
 
     #[instrument(level = "trace", skip(self))]
     fn create_information_channel_port(&self) -> impl InformationChannelPort + Send + Sync {
-        InformationChannelService::new(self.discord_adapter_arc())
+        InformationChannelService::new(self.discord_adapter())
     }
 
     #[instrument(level = "trace", skip(self))]

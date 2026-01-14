@@ -2,22 +2,27 @@ use application_ports::discord::ChannelId;
 use application_ports::information_channel::{InformationChannelError, InformationChannelPort};
 use async_trait::async_trait;
 use domain::ports::discord::DiscordPort;
-use std::sync::Arc;
 use tracing::{info, instrument};
 
-pub struct InformationChannelService {
-    discord_port: Arc<dyn DiscordPort + Sync + Send>,
+pub struct InformationChannelService<TDiscordPort> {
+    discord_port: TDiscordPort,
 }
 
-impl InformationChannelService {
+impl<TDiscordPort> InformationChannelService<TDiscordPort>
+where
+    TDiscordPort: DiscordPort + Sync + Send,
+{
     #[instrument(level = "debug", skip_all)]
-    pub fn new(discord_port: Arc<dyn DiscordPort + Sync + Send>) -> Self {
+    pub fn new(discord_port: TDiscordPort) -> Self {
         Self { discord_port }
     }
 }
 
 #[async_trait]
-impl InformationChannelPort for InformationChannelService {
+impl<TDiscordPort> InformationChannelPort for InformationChannelService<TDiscordPort>
+where
+    TDiscordPort: DiscordPort + Sync + Send,
+{
     #[instrument(level = "info", skip(self))]
     async fn update_information(
         &self,
