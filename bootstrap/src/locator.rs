@@ -107,7 +107,7 @@ impl Locator for ApplicationPortLocator {
     fn create_role_sync_job_handler_port(&self) -> impl RoleSyncJobHandlerPort + Send + Sync {
         RoleSyncJobHandler::new(
             self.discord_adapter(),
-            self.authenticated_user_repository_arc(),
+            self.authenticated_user_repository(),
             self.role_sync_requested_repository.clone(),
             self.everyone_roles.clone(),
             self.additional_student_roles.clone(),

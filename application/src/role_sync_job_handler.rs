@@ -14,9 +14,9 @@ use domain_shared::discord::RoleId;
 use std::sync::Arc;
 use tracing::{error, info, instrument};
 
-pub struct RoleSyncJobHandler {
+pub struct RoleSyncJobHandler<TAuthenticatedUserRepository> {
     discord_port: Arc<dyn DiscordPort + Send + Sync>,
-    authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
+    authenticated_user_repository: TAuthenticatedUserRepository,
     role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
     everyone_roles: Vec<RoleId>,
     additional_student_roles: Vec<RoleId>,
@@ -25,11 +25,14 @@ pub struct RoleSyncJobHandler {
     unknown_class_role_id: RoleId,
 }
 
-impl RoleSyncJobHandler {
+impl<TAuthenticatedUserRepository> RoleSyncJobHandler<TAuthenticatedUserRepository>
+where
+    TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+{
     #[instrument(level = "trace", skip_all)]
     pub fn new(
         discord_port: Arc<dyn DiscordPort + Send + Sync>,
-        authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
+        authenticated_user_repository: TAuthenticatedUserRepository,
         role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
         everyone_roles: Vec<RoleId>,
         additional_student_roles: Vec<RoleId>,
@@ -132,7 +135,11 @@ impl RoleSyncJobHandler {
 }
 
 #[async_trait]
-impl RoleSyncJobHandlerPort for RoleSyncJobHandler {
+impl<TAuthenticatedUserRepository> RoleSyncJobHandlerPort
+    for RoleSyncJobHandler<TAuthenticatedUserRepository>
+where
+    TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+{
     #[instrument(level = "debug", skip_all)]
     async fn tick(&mut self) -> Result<(), RoleSyncJobHandlerError> {
         let high_priority = self
