@@ -18,18 +18,21 @@ use domain::ports::oauth::{OAuthError, OAuthPort, OAuthToken};
 use std::sync::Arc;
 use tracing::{error, info, instrument, warn};
 
-pub struct UserInfoSyncJobHandler {
+pub struct UserInfoSyncJobHandler<TAuthenticatedUserRepository> {
     oauth_port: Arc<dyn OAuthPort + Send + Sync>,
-    authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
+    authenticated_user_repository: TAuthenticatedUserRepository,
     role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
     user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
 }
 
-impl UserInfoSyncJobHandler {
+impl<TAuthenticatedUserRepository> UserInfoSyncJobHandler<TAuthenticatedUserRepository>
+where
+    TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+{
     #[instrument(level = "trace", skip_all)]
     pub fn new(
         oauth_port: Arc<dyn OAuthPort + Send + Sync>,
-        authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
+        authenticated_user_repository: TAuthenticatedUserRepository,
         role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
         user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
     ) -> Self {
@@ -152,7 +155,11 @@ impl UserInfoSyncJobHandler {
 }
 
 #[async_trait]
-impl UserInfoSyncJobHandlerPort for UserInfoSyncJobHandler {
+impl<TAuthenticatedUserRepository> UserInfoSyncJobHandlerPort
+    for UserInfoSyncJobHandler<TAuthenticatedUserRepository>
+where
+    TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+{
     #[instrument(level = "debug", skip_all)]
     async fn tick(&self) -> Result<(), UserInfoSyncJobHandlerError> {
         let high_priority = self

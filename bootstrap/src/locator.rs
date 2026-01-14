@@ -50,13 +50,6 @@ impl ApplicationPortLocator {
     }
 
     #[instrument(level = "trace", skip(self))]
-    fn authenticated_user_repository_arc(
-        &self,
-    ) -> Arc<impl AuthenticatedUserRepository + Send + Sync> {
-        Arc::new(self.authenticated_user_repository())
-    }
-
-    #[instrument(level = "trace", skip(self))]
     fn archived_authenticated_user_repository(
         &self,
     ) -> impl ArchivedAuthenticatedUserRepository + Send + Sync {
@@ -121,7 +114,7 @@ impl Locator for ApplicationPortLocator {
     ) -> impl UserInfoSyncJobHandlerPort + Send + Sync {
         UserInfoSyncJobHandler::new(
             self.oauth_adapter.clone(),
-            self.authenticated_user_repository_arc(),
+            self.authenticated_user_repository(),
             self.role_sync_requested_repository.clone(),
             self.user_info_sync_requested_repository.clone(),
         )
