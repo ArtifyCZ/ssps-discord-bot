@@ -1,6 +1,7 @@
 use crate::application_ports::Locator;
 use crate::discord::{Context, Error};
 use application_ports::user::AuthenticatedUserInfoDto;
+use application_ports::user::UserPort;
 use domain_shared::discord::UserId;
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::{CreateEmbed, Mentionable};
@@ -18,7 +19,7 @@ pub async fn command<D: Sync + Locator>(
     #[description = "Selected target"] target: serenity::User,
     #[description = "Force refresh user info (default false)"] force_refresh: Option<bool>,
 ) -> Result<(), Error> {
-    let user_port = ctx.data().get_user_port();
+    let user_port = ctx.data().create_user_port();
 
     info!(
         guild_id = ctx.guild_id().map(|id| id.get()),

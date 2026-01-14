@@ -12,7 +12,6 @@ use url::Url;
 
 use crate::args::CommonArgs;
 use application::role_sync_job_handler::RoleSyncJobHandler;
-use application::user::UserService;
 use application::user_info_sync_job_handler::UserInfoSyncJobHandler;
 use infrastructure::authentication::archived_authenticated_user::PostgresArchivedAuthenticatedUserRepository;
 use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUserRepository;
@@ -141,11 +140,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         role_sync_requested_repository.clone(),
         user_info_sync_requested_repository.clone(),
     ));
-    let user_adapter = Arc::new(UserService::new(
-        authenticated_user_repository.clone(),
-        role_sync_requested_repository.clone(),
-        user_info_sync_requested_repository.clone(),
-    ));
 
     let locator = locator::ApplicationPortLocator {
         everyone_roles: everyone_roles.clone(),
@@ -160,7 +154,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         role_sync_requested_repository: role_sync_requested_repository.clone(),
         user_authentication_request_repository: user_authentication_request_repository.clone(),
         user_info_sync_requested_repository: user_info_sync_requested_repository.clone(),
-        user_adapter,
         role_sync_job_handler_adapter,
         user_info_sync_job_handler_adapter,
         serenity_client: serenity_client.clone(),

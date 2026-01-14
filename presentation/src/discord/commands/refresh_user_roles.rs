@@ -1,6 +1,7 @@
 use crate::application_ports::Locator;
 use crate::discord::{response, Context, Error};
 use application_ports::user::UserError;
+use application_ports::user::UserPort;
 use domain_shared::discord::UserId;
 use poise::serenity_prelude as serenity;
 use poise::CreateReply;
@@ -16,7 +17,7 @@ pub async fn command<D: Sync + Locator>(
     ctx: Context<'_, D>,
     #[description = "Selected target"] target: serenity::User,
 ) -> Result<(), Error> {
-    let user_port = ctx.data().get_user_port();
+    let user_port = ctx.data().create_user_port();
 
     info!(
         guild_id = ctx.guild_id().map(|id| id.get()),

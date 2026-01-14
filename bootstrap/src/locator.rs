@@ -39,7 +39,6 @@ pub struct ApplicationPortLocator {
         Arc<PostgresUserAuthenticationRequestRepository>,
     pub(crate) user_info_sync_requested_repository: Arc<PostgresUserInfoSyncRequestedRepository>,
 
-    pub(crate) user_adapter: Arc<UserService>,
     pub(crate) role_sync_job_handler_adapter: Arc<RoleSyncJobHandler>,
     pub(crate) user_info_sync_job_handler_adapter: Arc<UserInfoSyncJobHandler>,
     pub(crate) serenity_client: Arc<serenity::http::Http>,
@@ -91,8 +90,12 @@ impl Locator for ApplicationPortLocator {
     }
 
     #[instrument(level = "trace", skip(self))]
-    fn get_user_port(&self) -> &(dyn UserPort + Send + Sync) {
-        &*self.user_adapter
+    fn create_user_port(&self) -> impl UserPort + Send + Sync {
+        UserService::new(
+            self.authenticated_user_repository.clone(),
+            self.role_sync_requested_repository.clone(),
+            self.user_info_sync_requested_repository.clone(),
+        )
     }
 
     #[instrument(level = "trace", skip(self))]
