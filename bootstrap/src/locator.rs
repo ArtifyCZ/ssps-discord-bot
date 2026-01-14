@@ -10,6 +10,7 @@ use application_ports::periodic_scheduling_handler::PeriodicSchedulingHandlerPor
 use application_ports::role_sync_job_handler::RoleSyncJobHandlerPort;
 use application_ports::user::UserPort;
 use application_ports::user_info_sync_job_handler::UserInfoSyncJobHandlerPort;
+use domain::ports::discord::DiscordPort;
 use domain_shared::discord::{InviteLink, RoleId};
 use infrastructure::authentication::archived_authenticated_user::PostgresArchivedAuthenticatedUserRepository;
 use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUserRepository;
@@ -19,6 +20,7 @@ use infrastructure::jobs::role_sync_job_repository::PostgresRoleSyncRequestedRep
 use infrastructure::jobs::user_info_sync_job_repository::PostgresUserInfoSyncRequestedRepository;
 use infrastructure::oauth::OAuthAdapter;
 use presentation::application_ports::Locator;
+use serenity::all::GuildId;
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -28,8 +30,8 @@ pub struct ApplicationPortLocator {
     pub(crate) additional_student_roles: Vec<RoleId>,
     pub(crate) unknown_class_role_id: RoleId,
     pub(crate) invite_link: InviteLink,
+    pub(crate) guild_id: GuildId,
 
-    pub(crate) discord_adapter: Arc<DiscordAdapter>,
     pub(crate) oauth_adapter: Arc<OAuthAdapter>,
     pub(crate) authenticated_user_repository: Arc<PostgresAuthenticatedUserRepository>,
     pub(crate) archived_authenticated_user_repository:
@@ -40,6 +42,16 @@ pub struct ApplicationPortLocator {
     pub(crate) user_info_sync_requested_repository: Arc<PostgresUserInfoSyncRequestedRepository>,
 
     pub(crate) serenity_client: Arc<serenity::http::Http>,
+}
+
+impl ApplicationPortLocator {
+    #[instrument(level = "trace", skip(self))]
+    fn discord_adapter(&self) -> Arc<impl DiscordPort + Send + Sync> {
+        Arc::new(DiscordAdapter::new(
+            self.serenity_client.clone(),
+            self.guild_id,
+        ))
+    }
 }
 
 impl Locator for ApplicationPortLocator {
@@ -63,7 +75,7 @@ impl Locator for ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
     fn create_periodic_scheduling_handler_port(&self) -> impl PeriodicSchedulingHandlerPort {
         PeriodicSchedulingHandler::new(
-            self.discord_adapter.clone(),
+            self.discord_adapter(),
             self.authenticated_user_repository.clone(),
             self.role_sync_requested_repository.clone(),
             self.user_info_sync_requested_repository.clone(),
@@ -73,7 +85,7 @@ impl Locator for ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
     fn create_role_sync_job_handler_port(&self) -> impl RoleSyncJobHandlerPort + Send + Sync {
         RoleSyncJobHandler::new(
-            self.discord_adapter.clone(),
+            self.discord_adapter(),
             self.authenticated_user_repository.clone(),
             self.role_sync_requested_repository.clone(),
             self.everyone_roles.clone(),
@@ -96,7 +108,7 @@ impl Locator for ApplicationPortLocator {
 
     #[instrument(level = "trace", skip(self))]
     fn create_information_channel_port(&self) -> impl InformationChannelPort + Send + Sync {
-        InformationChannelService::new(self.discord_adapter.clone())
+        InformationChannelService::new(self.discord_adapter())
     }
 
     #[instrument(level = "trace", skip(self))]

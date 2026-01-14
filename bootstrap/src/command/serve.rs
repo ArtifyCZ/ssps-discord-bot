@@ -14,7 +14,6 @@ use crate::args::CommonArgs;
 use infrastructure::authentication::archived_authenticated_user::PostgresArchivedAuthenticatedUserRepository;
 use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUserRepository;
 use infrastructure::authentication::user_authentication_request::PostgresUserAuthenticationRequestRepository;
-use infrastructure::discord::DiscordAdapter;
 use infrastructure::jobs::role_sync_job_repository::PostgresRoleSyncRequestedRepository;
 use infrastructure::jobs::user_info_sync_job_repository::PostgresUserInfoSyncRequestedRepository;
 use poise::serenity_prelude as serenity;
@@ -101,7 +100,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
     let database_connection = sqlx::PgPool::connect(&database_url).await?;
     let serenity_client = ClientBuilder::new(&discord_bot_token, intents).await?.http;
 
-    let discord_adapter = Arc::new(DiscordAdapter::new(serenity_client.clone(), guild));
     let oauth_adapter = Arc::new(OAuthAdapter::new(oauth_adapter_config));
     let archived_authenticated_user_repository = Arc::new(
         PostgresArchivedAuthenticatedUserRepository::new(database_connection.clone()),
@@ -129,8 +127,8 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         additional_student_roles: additional_student_roles.clone(),
         unknown_class_role_id,
         invite_link: invite_link.clone(),
+        guild_id: guild,
 
-        discord_adapter: discord_adapter.clone(),
         oauth_adapter: oauth_adapter.clone(),
         archived_authenticated_user_repository: archived_authenticated_user_repository.clone(),
         authenticated_user_repository: authenticated_user_repository.clone(),
