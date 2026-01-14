@@ -10,6 +10,8 @@ use application_ports::periodic_scheduling_handler::PeriodicSchedulingHandlerPor
 use application_ports::role_sync_job_handler::RoleSyncJobHandlerPort;
 use application_ports::user::UserPort;
 use application_ports::user_info_sync_job_handler::UserInfoSyncJobHandlerPort;
+use domain::authentication::archived_authenticated_user::ArchivedAuthenticatedUserRepository;
+use domain::authentication::authenticated_user::AuthenticatedUserRepository;
 use domain::ports::discord::DiscordPort;
 use domain_shared::discord::{InviteLink, RoleId};
 use infrastructure::authentication::archived_authenticated_user::PostgresArchivedAuthenticatedUserRepository;
@@ -33,18 +35,32 @@ pub struct ApplicationPortLocator {
     pub(crate) guild_id: GuildId,
 
     pub(crate) oauth_adapter: Arc<OAuthAdapter>,
-    pub(crate) authenticated_user_repository: Arc<PostgresAuthenticatedUserRepository>,
-    pub(crate) archived_authenticated_user_repository:
-        Arc<PostgresArchivedAuthenticatedUserRepository>,
     pub(crate) role_sync_requested_repository: Arc<PostgresRoleSyncRequestedRepository>,
     pub(crate) user_authentication_request_repository:
         Arc<PostgresUserAuthenticationRequestRepository>,
     pub(crate) user_info_sync_requested_repository: Arc<PostgresUserInfoSyncRequestedRepository>,
 
+    pub(crate) postgres_pool: sqlx::PgPool,
     pub(crate) serenity_client: Arc<serenity::http::Http>,
 }
 
 impl ApplicationPortLocator {
+    #[instrument(level = "trace", skip(self))]
+    fn authenticated_user_repository(&self) -> Arc<impl AuthenticatedUserRepository + Send + Sync> {
+        Arc::new(PostgresAuthenticatedUserRepository::new(
+            self.postgres_pool.clone(),
+        ))
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    fn archived_authenticated_user_repository(
+        &self,
+    ) -> Arc<impl ArchivedAuthenticatedUserRepository + Send + Sync> {
+        Arc::new(PostgresArchivedAuthenticatedUserRepository::new(
+            self.postgres_pool.clone(),
+        ))
+    }
+
     #[instrument(level = "trace", skip(self))]
     fn discord_adapter(&self) -> Arc<impl DiscordPort + Send + Sync> {
         Arc::new(DiscordAdapter::new(
@@ -59,10 +75,8 @@ impl Locator for ApplicationPortLocator {
     fn create_authentication_port(&self) -> impl AuthenticationPort + Send + Sync {
         AuthenticationService {
             oauth_port: self.oauth_adapter.clone(),
-            archived_authenticated_user_repository: self
-                .archived_authenticated_user_repository
-                .clone(),
-            authenticated_user_repository: self.authenticated_user_repository.clone(),
+            archived_authenticated_user_repository: self.archived_authenticated_user_repository(),
+            authenticated_user_repository: self.authenticated_user_repository(),
             user_authentication_request_repository: self
                 .user_authentication_request_repository
                 .clone(),
@@ -76,7 +90,7 @@ impl Locator for ApplicationPortLocator {
     fn create_periodic_scheduling_handler_port(&self) -> impl PeriodicSchedulingHandlerPort {
         PeriodicSchedulingHandler::new(
             self.discord_adapter(),
-            self.authenticated_user_repository.clone(),
+            self.authenticated_user_repository(),
             self.role_sync_requested_repository.clone(),
             self.user_info_sync_requested_repository.clone(),
         )
@@ -86,7 +100,7 @@ impl Locator for ApplicationPortLocator {
     fn create_role_sync_job_handler_port(&self) -> impl RoleSyncJobHandlerPort + Send + Sync {
         RoleSyncJobHandler::new(
             self.discord_adapter(),
-            self.authenticated_user_repository.clone(),
+            self.authenticated_user_repository(),
             self.role_sync_requested_repository.clone(),
             self.everyone_roles.clone(),
             self.additional_student_roles.clone(),
@@ -100,7 +114,7 @@ impl Locator for ApplicationPortLocator {
     ) -> impl UserInfoSyncJobHandlerPort + Send + Sync {
         UserInfoSyncJobHandler::new(
             self.oauth_adapter.clone(),
-            self.authenticated_user_repository.clone(),
+            self.authenticated_user_repository(),
             self.role_sync_requested_repository.clone(),
             self.user_info_sync_requested_repository.clone(),
         )
@@ -114,7 +128,7 @@ impl Locator for ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
     fn create_user_port(&self) -> impl UserPort + Send + Sync {
         UserService::new(
-            self.authenticated_user_repository.clone(),
+            self.authenticated_user_repository(),
             self.role_sync_requested_repository.clone(),
             self.user_info_sync_requested_repository.clone(),
         )

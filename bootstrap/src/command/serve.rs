@@ -11,8 +11,6 @@ use std::sync::Arc;
 use url::Url;
 
 use crate::args::CommonArgs;
-use infrastructure::authentication::archived_authenticated_user::PostgresArchivedAuthenticatedUserRepository;
-use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUserRepository;
 use infrastructure::authentication::user_authentication_request::PostgresUserAuthenticationRequestRepository;
 use infrastructure::jobs::role_sync_job_repository::PostgresRoleSyncRequestedRepository;
 use infrastructure::jobs::user_info_sync_job_repository::PostgresUserInfoSyncRequestedRepository;
@@ -101,12 +99,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
     let serenity_client = ClientBuilder::new(&discord_bot_token, intents).await?.http;
 
     let oauth_adapter = Arc::new(OAuthAdapter::new(oauth_adapter_config));
-    let archived_authenticated_user_repository = Arc::new(
-        PostgresArchivedAuthenticatedUserRepository::new(database_connection.clone()),
-    );
-    let authenticated_user_repository = Arc::new(PostgresAuthenticatedUserRepository::new(
-        database_connection.clone(),
-    ));
     let user_authentication_request_repository = Arc::new(
         PostgresUserAuthenticationRequestRepository::new(database_connection.clone()),
     );
@@ -130,11 +122,11 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         guild_id: guild,
 
         oauth_adapter: oauth_adapter.clone(),
-        archived_authenticated_user_repository: archived_authenticated_user_repository.clone(),
-        authenticated_user_repository: authenticated_user_repository.clone(),
         role_sync_requested_repository: role_sync_requested_repository.clone(),
         user_authentication_request_repository: user_authentication_request_repository.clone(),
         user_info_sync_requested_repository: user_info_sync_requested_repository.clone(),
+
+        postgres_pool: database_connection,
         serenity_client: serenity_client.clone(),
     };
 
