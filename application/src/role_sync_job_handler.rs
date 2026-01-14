@@ -14,8 +14,8 @@ use domain_shared::discord::RoleId;
 use std::sync::Arc;
 use tracing::{error, info, instrument};
 
-pub struct RoleSyncJobHandler<TAuthenticatedUserRepository> {
-    discord_port: Arc<dyn DiscordPort + Send + Sync>,
+pub struct RoleSyncJobHandler<TDiscordPort, TAuthenticatedUserRepository> {
+    discord_port: TDiscordPort,
     authenticated_user_repository: TAuthenticatedUserRepository,
     role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
     everyone_roles: Vec<RoleId>,
@@ -25,13 +25,15 @@ pub struct RoleSyncJobHandler<TAuthenticatedUserRepository> {
     unknown_class_role_id: RoleId,
 }
 
-impl<TAuthenticatedUserRepository> RoleSyncJobHandler<TAuthenticatedUserRepository>
+impl<TDiscordPort, TAuthenticatedUserRepository>
+    RoleSyncJobHandler<TDiscordPort, TAuthenticatedUserRepository>
 where
+    TDiscordPort: DiscordPort + Send + Sync,
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
 {
     #[instrument(level = "trace", skip_all)]
     pub fn new(
-        discord_port: Arc<dyn DiscordPort + Send + Sync>,
+        discord_port: TDiscordPort,
         authenticated_user_repository: TAuthenticatedUserRepository,
         role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
         everyone_roles: Vec<RoleId>,
@@ -135,9 +137,10 @@ where
 }
 
 #[async_trait]
-impl<TAuthenticatedUserRepository> RoleSyncJobHandlerPort
-    for RoleSyncJobHandler<TAuthenticatedUserRepository>
+impl<TDiscordPort, TAuthenticatedUserRepository> RoleSyncJobHandlerPort
+    for RoleSyncJobHandler<TDiscordPort, TAuthenticatedUserRepository>
 where
+    TDiscordPort: DiscordPort + Send + Sync,
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
 {
     #[instrument(level = "debug", skip_all)]
