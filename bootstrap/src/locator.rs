@@ -85,7 +85,7 @@ impl Locator for ApplicationPortLocator {
         AuthenticationService {
             oauth_port: self.oauth_adapter.clone(),
             archived_authenticated_user_repository: self.archived_authenticated_user_repository(),
-            authenticated_user_repository: self.authenticated_user_repository_arc(),
+            authenticated_user_repository: self.authenticated_user_repository(),
             user_authentication_request_repository: self.user_authentication_request_repository(),
             user_info_sync_requested_repository: self.user_info_sync_requested_repository.clone(),
             role_sync_requested_repository: self.role_sync_requested_repository.clone(),

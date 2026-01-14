@@ -27,11 +27,12 @@ use tracing::{error, info, instrument, warn, Span};
 
 pub struct AuthenticationService<
     TArchivedAuthenticatedUserRepository,
+    TAuthenticatedUserRepository,
     TUserAuthenticationRequestRepository,
 > {
     pub oauth_port: Arc<dyn OAuthPort + Send + Sync>,
     pub archived_authenticated_user_repository: TArchivedAuthenticatedUserRepository,
-    pub authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
+    pub authenticated_user_repository: TAuthenticatedUserRepository,
     pub user_authentication_request_repository: TUserAuthenticationRequestRepository,
     pub user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
     pub role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
@@ -39,13 +40,19 @@ pub struct AuthenticationService<
 }
 
 #[async_trait]
-impl<TArchivedAuthenticatedUserRepository, TUserAuthenticationRequestRepository> AuthenticationPort
+impl<
+        TArchivedAuthenticatedUserRepository,
+        TAuthenticatedUserRepository,
+        TUserAuthenticationRequestRepository,
+    > AuthenticationPort
     for AuthenticationService<
         TArchivedAuthenticatedUserRepository,
+        TAuthenticatedUserRepository,
         TUserAuthenticationRequestRepository,
     >
 where
     TArchivedAuthenticatedUserRepository: ArchivedAuthenticatedUserRepository + Send + Sync,
+    TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
     TUserAuthenticationRequestRepository: UserAuthenticationRequestRepository + Send + Sync,
 {
     #[instrument(level = "info", skip(self))]
