@@ -18,8 +18,8 @@ use std::sync::Arc;
 use std::vec::IntoIter;
 use tracing::{error, info, instrument};
 
-pub struct PeriodicSchedulingHandler<TAuthenticatedUserRepository> {
-    discord_port: Arc<dyn DiscordPort + Send + Sync>,
+pub struct PeriodicSchedulingHandler<TDiscordPort, TAuthenticatedUserRepository> {
+    discord_port: TDiscordPort,
     authenticated_user_repository: TAuthenticatedUserRepository,
     role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
     user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
@@ -28,13 +28,15 @@ pub struct PeriodicSchedulingHandler<TAuthenticatedUserRepository> {
     discord_members_chunk_offset: Option<UserId>,
 }
 
-impl<TAuthenticatedUserRepository> PeriodicSchedulingHandler<TAuthenticatedUserRepository>
+impl<TDiscordPort, TAuthenticatedUserRepository>
+    PeriodicSchedulingHandler<TDiscordPort, TAuthenticatedUserRepository>
 where
+    TDiscordPort: DiscordPort + Send + Sync,
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
 {
     #[instrument(level = "trace", skip_all)]
     pub fn new(
-        discord_port: Arc<dyn DiscordPort + Send + Sync>,
+        discord_port: TDiscordPort,
         authenticated_user_repository: TAuthenticatedUserRepository,
         role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
         user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
@@ -126,9 +128,10 @@ where
 }
 
 #[async_trait]
-impl<TAuthenticatedUserRepository> PeriodicSchedulingHandlerPort
-    for PeriodicSchedulingHandler<TAuthenticatedUserRepository>
+impl<TDiscordPort, TAuthenticatedUserRepository> PeriodicSchedulingHandlerPort
+    for PeriodicSchedulingHandler<TDiscordPort, TAuthenticatedUserRepository>
 where
+    TDiscordPort: DiscordPort + Send + Sync,
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
 {
     #[instrument(level = "debug", skip_all)]
