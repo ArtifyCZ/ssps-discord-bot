@@ -25,22 +25,28 @@ use domain_shared::discord::UserId;
 use std::sync::Arc;
 use tracing::{error, info, instrument, warn, Span};
 
-pub struct AuthenticationService<TArchivedAuthenticatedUserRepository> {
+pub struct AuthenticationService<
+    TArchivedAuthenticatedUserRepository,
+    TUserAuthenticationRequestRepository,
+> {
     pub oauth_port: Arc<dyn OAuthPort + Send + Sync>,
     pub archived_authenticated_user_repository: TArchivedAuthenticatedUserRepository,
     pub authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
-    pub user_authentication_request_repository:
-        Arc<dyn UserAuthenticationRequestRepository + Send + Sync>,
+    pub user_authentication_request_repository: TUserAuthenticationRequestRepository,
     pub user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
     pub role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
     pub invite_link: InviteLink,
 }
 
 #[async_trait]
-impl<TArchivedAuthenticatedUserRepository> AuthenticationPort
-    for AuthenticationService<TArchivedAuthenticatedUserRepository>
+impl<TArchivedAuthenticatedUserRepository, TUserAuthenticationRequestRepository> AuthenticationPort
+    for AuthenticationService<
+        TArchivedAuthenticatedUserRepository,
+        TUserAuthenticationRequestRepository,
+    >
 where
     TArchivedAuthenticatedUserRepository: ArchivedAuthenticatedUserRepository + Send + Sync,
+    TUserAuthenticationRequestRepository: UserAuthenticationRequestRepository + Send + Sync,
 {
     #[instrument(level = "info", skip(self))]
     async fn create_authentication_link(
