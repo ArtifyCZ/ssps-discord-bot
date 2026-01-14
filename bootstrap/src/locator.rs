@@ -39,8 +39,6 @@ pub struct ApplicationPortLocator {
         Arc<PostgresUserAuthenticationRequestRepository>,
     pub(crate) user_info_sync_requested_repository: Arc<PostgresUserInfoSyncRequestedRepository>,
 
-    pub(crate) role_sync_job_handler_adapter: Arc<RoleSyncJobHandler>,
-    pub(crate) user_info_sync_job_handler_adapter: Arc<UserInfoSyncJobHandler>,
     pub(crate) serenity_client: Arc<serenity::http::Http>,
 }
 
@@ -85,6 +83,18 @@ impl Locator for ApplicationPortLocator {
     }
 
     #[instrument(level = "trace", skip(self))]
+    fn create_user_info_sync_job_handler_port(
+        &self,
+    ) -> impl UserInfoSyncJobHandlerPort + Send + Sync {
+        UserInfoSyncJobHandler::new(
+            self.oauth_adapter.clone(),
+            self.authenticated_user_repository.clone(),
+            self.role_sync_requested_repository.clone(),
+            self.user_info_sync_requested_repository.clone(),
+        )
+    }
+
+    #[instrument(level = "trace", skip(self))]
     fn create_information_channel_port(&self) -> impl InformationChannelPort + Send + Sync {
         InformationChannelService::new(self.discord_adapter.clone())
     }
@@ -96,13 +106,6 @@ impl Locator for ApplicationPortLocator {
             self.role_sync_requested_repository.clone(),
             self.user_info_sync_requested_repository.clone(),
         )
-    }
-
-    #[instrument(level = "trace", skip(self))]
-    fn get_user_info_sync_job_handler_port(
-        &self,
-    ) -> &(dyn UserInfoSyncJobHandlerPort + Send + Sync) {
-        &*self.user_info_sync_job_handler_adapter
     }
 
     #[instrument(level = "trace", skip(self))]

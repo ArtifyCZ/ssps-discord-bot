@@ -11,8 +11,6 @@ use std::sync::Arc;
 use url::Url;
 
 use crate::args::CommonArgs;
-use application::role_sync_job_handler::RoleSyncJobHandler;
-use application::user_info_sync_job_handler::UserInfoSyncJobHandler;
 use infrastructure::authentication::archived_authenticated_user::PostgresArchivedAuthenticatedUserRepository;
 use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUserRepository;
 use infrastructure::authentication::user_authentication_request::PostgresUserAuthenticationRequestRepository;
@@ -126,21 +124,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
             user_info_sync_job_wake_tx,
         ));
 
-    let role_sync_job_handler_adapter = Arc::new(RoleSyncJobHandler::new(
-        discord_adapter.clone(),
-        authenticated_user_repository.clone(),
-        role_sync_requested_repository.clone(),
-        everyone_roles.clone(),
-        additional_student_roles.clone(),
-        unknown_class_role_id,
-    ));
-    let user_info_sync_job_handler_adapter = Arc::new(UserInfoSyncJobHandler::new(
-        oauth_adapter.clone(),
-        authenticated_user_repository.clone(),
-        role_sync_requested_repository.clone(),
-        user_info_sync_requested_repository.clone(),
-    ));
-
     let locator = locator::ApplicationPortLocator {
         everyone_roles: everyone_roles.clone(),
         additional_student_roles: additional_student_roles.clone(),
@@ -154,8 +137,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         role_sync_requested_repository: role_sync_requested_repository.clone(),
         user_authentication_request_repository: user_authentication_request_repository.clone(),
         user_info_sync_requested_repository: user_info_sync_requested_repository.clone(),
-        role_sync_job_handler_adapter,
-        user_info_sync_job_handler_adapter,
         serenity_client: serenity_client.clone(),
     };
 
