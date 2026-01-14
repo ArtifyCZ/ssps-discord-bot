@@ -25,10 +25,9 @@ use domain_shared::discord::UserId;
 use std::sync::Arc;
 use tracing::{error, info, instrument, warn, Span};
 
-pub struct AuthenticationService {
+pub struct AuthenticationService<TArchivedAuthenticatedUserRepository> {
     pub oauth_port: Arc<dyn OAuthPort + Send + Sync>,
-    pub archived_authenticated_user_repository:
-        Arc<dyn ArchivedAuthenticatedUserRepository + Send + Sync>,
+    pub archived_authenticated_user_repository: TArchivedAuthenticatedUserRepository,
     pub authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
     pub user_authentication_request_repository:
         Arc<dyn UserAuthenticationRequestRepository + Send + Sync>,
@@ -38,7 +37,11 @@ pub struct AuthenticationService {
 }
 
 #[async_trait]
-impl AuthenticationPort for AuthenticationService {
+impl<TArchivedAuthenticatedUserRepository> AuthenticationPort
+    for AuthenticationService<TArchivedAuthenticatedUserRepository>
+where
+    TArchivedAuthenticatedUserRepository: ArchivedAuthenticatedUserRepository + Send + Sync,
+{
     #[instrument(level = "info", skip(self))]
     async fn create_authentication_link(
         &self,
