@@ -2,6 +2,7 @@ use crate::application_ports::Locator;
 use crate::discord::{Context, Error};
 use application_ports::discord::ChannelId;
 use application_ports::information_channel::InformationChannelError;
+use application_ports::information_channel::InformationChannelPort;
 use poise::CreateReply;
 use tracing::{info, instrument};
 
@@ -19,7 +20,7 @@ pub async fn command<D: Sync + Locator>(ctx: Context<'_, D>) -> Result<(), Error
         "Updating information channel",
     );
 
-    let information_channel_port = ctx.data().get_information_channel_port();
+    let information_channel_port = ctx.data().create_information_channel_port();
     ctx.defer_ephemeral().await?;
 
     information_channel_port

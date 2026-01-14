@@ -39,7 +39,6 @@ pub struct ApplicationPortLocator {
         Arc<PostgresUserAuthenticationRequestRepository>,
     pub(crate) user_info_sync_requested_repository: Arc<PostgresUserInfoSyncRequestedRepository>,
 
-    pub(crate) information_channel_adapter: Arc<InformationChannelService>,
     pub(crate) user_adapter: Arc<UserService>,
     pub(crate) role_sync_job_handler_adapter: Arc<RoleSyncJobHandler>,
     pub(crate) user_info_sync_job_handler_adapter: Arc<UserInfoSyncJobHandler>,
@@ -87,8 +86,8 @@ impl Locator for ApplicationPortLocator {
     }
 
     #[instrument(level = "trace", skip(self))]
-    fn get_information_channel_port(&self) -> &(dyn InformationChannelPort + Send + Sync) {
-        &*self.information_channel_adapter
+    fn create_information_channel_port(&self) -> impl InformationChannelPort + Send + Sync {
+        InformationChannelService::new(self.discord_adapter.clone())
     }
 
     #[instrument(level = "trace", skip(self))]

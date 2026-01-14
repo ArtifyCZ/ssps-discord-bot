@@ -11,7 +11,6 @@ use std::sync::Arc;
 use url::Url;
 
 use crate::args::CommonArgs;
-use application::information_channel::InformationChannelService;
 use application::role_sync_job_handler::RoleSyncJobHandler;
 use application::user::UserService;
 use application::user_info_sync_job_handler::UserInfoSyncJobHandler;
@@ -128,8 +127,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
             user_info_sync_job_wake_tx,
         ));
 
-    let information_channel_adapter =
-        Arc::new(InformationChannelService::new(discord_adapter.clone()));
     let role_sync_job_handler_adapter = Arc::new(RoleSyncJobHandler::new(
         discord_adapter.clone(),
         authenticated_user_repository.clone(),
@@ -163,7 +160,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         role_sync_requested_repository: role_sync_requested_repository.clone(),
         user_authentication_request_repository: user_authentication_request_repository.clone(),
         user_info_sync_requested_repository: user_info_sync_requested_repository.clone(),
-        information_channel_adapter,
         user_adapter,
         role_sync_job_handler_adapter,
         user_info_sync_job_handler_adapter,
