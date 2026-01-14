@@ -135,7 +135,7 @@ impl Locator for ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
     fn create_user_port(&self) -> impl UserPort + Send + Sync {
         UserService::new(
-            self.authenticated_user_repository_arc(),
+            self.authenticated_user_repository(),
             self.role_sync_requested_repository.clone(),
             self.user_info_sync_requested_repository.clone(),
         )

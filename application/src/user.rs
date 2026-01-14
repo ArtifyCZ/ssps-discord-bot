@@ -14,16 +14,19 @@ use domain_shared::discord::UserId;
 use std::sync::Arc;
 use tracing::{info, instrument, warn};
 
-pub struct UserService {
-    authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
+pub struct UserService<TAuthenticatedUserRepository> {
+    authenticated_user_repository: TAuthenticatedUserRepository,
     role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
     user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
 }
 
-impl UserService {
+impl<TAuthenticatedUserRepository> UserService<TAuthenticatedUserRepository>
+where
+    TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+{
     #[instrument(level = "trace", skip_all)]
     pub fn new(
-        authenticated_user_repository: Arc<dyn AuthenticatedUserRepository + Send + Sync>,
+        authenticated_user_repository: TAuthenticatedUserRepository,
         role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
         user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
     ) -> Self {
@@ -36,7 +39,10 @@ impl UserService {
 }
 
 #[async_trait]
-impl UserPort for UserService {
+impl<TAuthenticatedUserRepository> UserPort for UserService<TAuthenticatedUserRepository>
+where
+    TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+{
     #[instrument(level = "info", skip(self))]
     async fn get_user_info(
         &self,
