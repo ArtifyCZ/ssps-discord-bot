@@ -6,14 +6,17 @@ use domain_shared::discord::UserId;
 use sqlx::{query, PgPool};
 use tracing::{instrument, warn};
 
-pub struct PostgresUserInfoSyncRequestedRepository {
-    pool: PgPool,
+pub struct PostgresUserInfoSyncRequestedRepository<'a> {
+    pool: &'a PgPool,
     user_info_sync_job_wake_tx: tokio::sync::mpsc::Sender<()>,
 }
 
-impl PostgresUserInfoSyncRequestedRepository {
+impl<'a> PostgresUserInfoSyncRequestedRepository<'a> {
     #[instrument(level = "trace", skip_all)]
-    pub fn new(pool: PgPool, user_info_sync_job_wake_tx: tokio::sync::mpsc::Sender<()>) -> Self {
+    pub fn new(
+        pool: &'a PgPool,
+        user_info_sync_job_wake_tx: tokio::sync::mpsc::Sender<()>,
+    ) -> Self {
         Self {
             pool,
             user_info_sync_job_wake_tx,
@@ -22,7 +25,7 @@ impl PostgresUserInfoSyncRequestedRepository {
 }
 
 #[async_trait]
-impl UserInfoSyncRequestedRepository for PostgresUserInfoSyncRequestedRepository {
+impl<'a> UserInfoSyncRequestedRepository for PostgresUserInfoSyncRequestedRepository<'a> {
     #[instrument(level = "debug", err, skip_all)]
     async fn save(
         &self,
@@ -40,7 +43,7 @@ impl UserInfoSyncRequestedRepository for PostgresUserInfoSyncRequestedRepository
                 request.user_id.0 as i64,
                 request.queued_at.naive_utc(),
             )
-        }.execute(&self.pool).await.map_err(|err| {
+        }.execute(self.pool).await.map_err(|err| {
             warn!(error = ?err, "Failed to save user info sync request");
             UserInfoSyncRequestedRepositoryError::ServiceUnavailable
         })?;
@@ -61,7 +64,7 @@ impl UserInfoSyncRequestedRepository for PostgresUserInfoSyncRequestedRepository
                 "SELECT user_id, queued_at, low_priority FROM user_info_sync_requested WHERE low_priority = $1 ORDER BY queued_at LIMIT 1",
                 low_priority,
             )
-                .fetch_optional(&self.pool)
+                .fetch_optional(self.pool)
                 .await
                 .map_err(|err| {
                     warn!(error = ?err, "Failed to fetch oldest user info sync request");
@@ -74,7 +77,7 @@ impl UserInfoSyncRequestedRepository for PostgresUserInfoSyncRequestedRepository
                 row.user_id as i64,
                 row.low_priority,
             )
-            .execute(&self.pool)
+            .execute(self.pool)
             .await
             .map_err(|err| {
                 warn!(error = ?err, "Failed to pop oldest user info sync request");
