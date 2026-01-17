@@ -18,23 +18,32 @@ use domain::ports::oauth::{OAuthError, OAuthPort, OAuthToken};
 use std::sync::Arc;
 use tracing::{error, info, instrument, warn};
 
-pub struct UserInfoSyncJobHandler<TAuthenticatedUserRepository, TOAuthAdapter> {
+pub struct UserInfoSyncJobHandler<
+    TAuthenticatedUserRepository,
+    TRoleSyncRequestedRepository,
+    TOAuthAdapter,
+> {
     authenticated_user_repository: TAuthenticatedUserRepository,
-    role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
+    role_sync_requested_repository: TRoleSyncRequestedRepository,
     user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
     oauth_port: TOAuthAdapter,
 }
 
-impl<TAuthenticatedUserRepository, TOAuthAdapter>
-    UserInfoSyncJobHandler<TAuthenticatedUserRepository, TOAuthAdapter>
+impl<TAuthenticatedUserRepository, TRoleSyncRequestedRepository, TOAuthAdapter>
+    UserInfoSyncJobHandler<
+        TAuthenticatedUserRepository,
+        TRoleSyncRequestedRepository,
+        TOAuthAdapter,
+    >
 where
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+    TRoleSyncRequestedRepository: RoleSyncRequestedRepository + Send + Sync,
     TOAuthAdapter: OAuthPort + Send + Sync,
 {
     #[instrument(level = "trace", skip_all)]
     pub fn new(
         authenticated_user_repository: TAuthenticatedUserRepository,
-        role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
+        role_sync_requested_repository: TRoleSyncRequestedRepository,
         user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
         oauth_port: TOAuthAdapter,
     ) -> Self {
@@ -157,10 +166,16 @@ where
 }
 
 #[async_trait]
-impl<TAuthenticatedUserRepository, TOAuthAdapter> UserInfoSyncJobHandlerPort
-    for UserInfoSyncJobHandler<TAuthenticatedUserRepository, TOAuthAdapter>
+impl<TAuthenticatedUserRepository, TRoleSyncRequestedRepository, TOAuthAdapter>
+    UserInfoSyncJobHandlerPort
+    for UserInfoSyncJobHandler<
+        TAuthenticatedUserRepository,
+        TRoleSyncRequestedRepository,
+        TOAuthAdapter,
+    >
 where
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+    TRoleSyncRequestedRepository: RoleSyncRequestedRepository + Send + Sync,
     TOAuthAdapter: OAuthPort + Send + Sync,
 {
     #[instrument(level = "debug", skip_all)]

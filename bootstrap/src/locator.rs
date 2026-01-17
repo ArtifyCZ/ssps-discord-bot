@@ -133,7 +133,7 @@ impl Locator for ApplicationPortLocator {
     ) -> impl UserInfoSyncJobHandlerPort + Send + Sync {
         UserInfoSyncJobHandler::new(
             self.authenticated_user_repository(),
-            self.role_sync_requested_repository_arc(),
+            self.role_sync_requested_repository(),
             self.user_info_sync_requested_repository.clone(),
             self.oauth_adapter(),
         )
