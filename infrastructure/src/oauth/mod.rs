@@ -3,7 +3,6 @@ mod csrf_token;
 
 use crate::oauth::authentication_link::oauth_to_domain_authentication_link;
 use crate::oauth::csrf_token::oauth_to_domain_csrf_token;
-use async_trait::async_trait;
 use chrono::Utc;
 use domain::ports::oauth::{OAuthError, OAuthPort, OAuthToken, UserInfoDto};
 use domain_shared::authentication::{
@@ -78,7 +77,6 @@ impl OAuthAdapter {
     }
 }
 
-#[async_trait]
 impl OAuthPort for OAuthAdapter {
     #[instrument(level = "debug", skip(self))]
     async fn create_authentication_link(&self) -> (AuthenticationLink, CsrfToken) {

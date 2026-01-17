@@ -1,24 +1,31 @@
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use domain_shared::authentication::{
     AccessToken, AuthenticationLink, ClientCallbackToken, CsrfToken, RefreshToken, UserGroup,
 };
 use std::fmt::Debug;
+use std::future::Future;
 use thiserror::Error;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[cfg_attr(feature = "mock", mockall::automock)]
-#[async_trait]
 pub trait OAuthPort {
-    async fn create_authentication_link(&self) -> (AuthenticationLink, CsrfToken);
-    async fn exchange_code_after_callback(
+    fn create_authentication_link(
+        &self,
+    ) -> impl Future<Output = (AuthenticationLink, CsrfToken)> + Send;
+    fn exchange_code_after_callback(
         &self,
         client_callback_token: ClientCallbackToken,
-    ) -> Result<OAuthToken, OAuthError>;
-    async fn refresh_token(&self, oauth_token: &OAuthToken) -> Result<OAuthToken, OAuthError>;
-    async fn get_user_info(&self, access_token: &AccessToken) -> Result<UserInfoDto, OAuthError>;
+    ) -> impl Future<Output = Result<OAuthToken, OAuthError>> + Send;
+    fn refresh_token(
+        &self,
+        oauth_token: &OAuthToken,
+    ) -> impl Future<Output = Result<OAuthToken, OAuthError>> + Send;
+    fn get_user_info(
+        &self,
+        access_token: &AccessToken,
+    ) -> impl Future<Output = Result<UserInfoDto, OAuthError>> + Send;
 }
 
 #[derive(Clone, Debug, PartialEq)]
