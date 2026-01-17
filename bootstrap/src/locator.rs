@@ -91,7 +91,7 @@ impl ApplicationPortLocator {
 
     #[instrument(level = "trace", skip(self))]
     fn oauth_adapter(&self) -> impl OAuthPort + Send + Sync {
-        OAuthAdapter::new(self.oauth_adapter_config.clone())
+        OAuthAdapter::new(&self.oauth_adapter_config)
     }
 }
 

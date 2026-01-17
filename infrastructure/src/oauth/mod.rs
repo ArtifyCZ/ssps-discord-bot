@@ -23,9 +23,6 @@ use serde::Deserialize;
 use std::time::Duration;
 use tracing::{error, instrument, warn};
 
-/**
- * @TODO: use references instead of cloning where possible to improve performance
- */
 #[derive(Clone, Debug)]
 pub struct OAuthAdapterConfig {
     pub client_id: ClientId,
@@ -70,7 +67,7 @@ struct UserGroupResponse {
 
 impl OAuthAdapter {
     #[instrument(level = "trace", skip_all)]
-    pub fn new(config: OAuthAdapterConfig) -> Self {
+    pub fn new(config: &OAuthAdapterConfig) -> Self {
         let oauth_client = create_oauth_client(config);
         let http_client = HttpClient::new();
 
@@ -270,7 +267,7 @@ impl OAuthPort for OAuthAdapter {
 }
 
 #[instrument(level = "trace", skip(config))]
-fn create_oauth_client(config: OAuthAdapterConfig) -> OAuthClient {
+fn create_oauth_client(config: &OAuthAdapterConfig) -> OAuthClient {
     let auth_url = AuthUrl::new(format!(
         "https://login.microsoftonline.com/{}/oauth2/v2.0/authorize",
         config.tenant_id.0
@@ -281,9 +278,11 @@ fn create_oauth_client(config: OAuthAdapterConfig) -> OAuthClient {
         config.tenant_id.0
     ))
     .unwrap();
-    BasicClient::new(config.client_id)
-        .set_client_secret(config.client_secret)
+    BasicClient::new(config.client_id.clone())
+        .set_client_secret(config.client_secret.clone())
         .set_auth_uri(auth_url)
         .set_token_uri(token_url)
-        .set_redirect_uri(RedirectUrl::from_url(config.authentication_callback_url))
+        .set_redirect_uri(RedirectUrl::from_url(
+            config.authentication_callback_url.clone(),
+        ))
 }
