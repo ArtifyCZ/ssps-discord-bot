@@ -38,10 +38,11 @@ pub struct ApplicationPortLocator {
     pub(crate) guild_id: GuildId,
     pub(crate) oauth_adapter_config: OAuthAdapterConfig,
 
-    pub(crate) role_sync_requested_repository: Arc<PostgresRoleSyncRequestedRepository>,
     pub(crate) user_info_sync_requested_repository: Arc<PostgresUserInfoSyncRequestedRepository>,
     pub(crate) postgres_pool: sqlx::PgPool,
     pub(crate) serenity_client: Arc<serenity::http::Http>,
+
+    pub(crate) role_sync_job_wake_tx: tokio::sync::mpsc::Sender<()>,
 }
 
 impl ApplicationPortLocator {
@@ -58,10 +59,18 @@ impl ApplicationPortLocator {
     }
 
     #[instrument(level = "trace", skip(self))]
+    fn role_sync_requested_repository(&self) -> impl RoleSyncRequestedRepository + Send + Sync {
+        PostgresRoleSyncRequestedRepository::new(
+            self.postgres_pool.clone(),
+            self.role_sync_job_wake_tx.clone(),
+        )
+    }
+
+    #[instrument(level = "trace", skip(self))]
     fn role_sync_requested_repository_arc(
         &self,
     ) -> Arc<impl RoleSyncRequestedRepository + Send + Sync> {
-        self.role_sync_requested_repository.clone()
+        Arc::new(self.role_sync_requested_repository())
     }
 
     #[instrument(level = "trace", skip(self))]

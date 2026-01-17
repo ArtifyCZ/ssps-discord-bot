@@ -11,7 +11,6 @@ use std::sync::Arc;
 use url::Url;
 
 use crate::args::CommonArgs;
-use infrastructure::jobs::role_sync_job_repository::PostgresRoleSyncRequestedRepository;
 use infrastructure::jobs::user_info_sync_job_repository::PostgresUserInfoSyncRequestedRepository;
 use poise::serenity_prelude as serenity;
 use presentation::worker::run_worker;
@@ -98,10 +97,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
     let serenity_client = ClientBuilder::new(&discord_bot_token, intents).await?.http;
 
     let (role_sync_job_wake_tx, role_sync_job_wake_rx) = tokio::sync::mpsc::channel(24);
-    let role_sync_requested_repository = Arc::new(PostgresRoleSyncRequestedRepository::new(
-        database_connection.clone(),
-        role_sync_job_wake_tx,
-    ));
     let (user_info_sync_job_wake_tx, user_info_sync_job_wake_rx) = tokio::sync::mpsc::channel(24);
     let user_info_sync_requested_repository =
         Arc::new(PostgresUserInfoSyncRequestedRepository::new(
@@ -117,11 +112,12 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         guild_id: guild,
         oauth_adapter_config,
 
-        role_sync_requested_repository: role_sync_requested_repository.clone(),
         user_info_sync_requested_repository: user_info_sync_requested_repository.clone(),
 
         postgres_pool: database_connection,
         serenity_client: serenity_client.clone(),
+
+        role_sync_job_wake_tx,
     };
 
     let api = tokio::spawn(run_api(locator.clone(), 8080));
