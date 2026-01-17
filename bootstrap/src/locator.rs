@@ -72,11 +72,6 @@ impl ApplicationPortLocator {
     fn oauth_adapter(&self) -> impl OAuthPort + Send + Sync {
         OAuthAdapter::new(self.oauth_adapter_config.clone())
     }
-
-    #[instrument(level = "trace", skip(self))]
-    fn oauth_adapter_arc(&self) -> Arc<impl OAuthPort + Send + Sync> {
-        Arc::new(self.oauth_adapter())
-    }
 }
 
 impl Locator for ApplicationPortLocator {
@@ -120,10 +115,10 @@ impl Locator for ApplicationPortLocator {
         &self,
     ) -> impl UserInfoSyncJobHandlerPort + Send + Sync {
         UserInfoSyncJobHandler::new(
-            self.oauth_adapter_arc(),
             self.authenticated_user_repository(),
             self.role_sync_requested_repository.clone(),
             self.user_info_sync_requested_repository.clone(),
+            self.oauth_adapter(),
         )
     }
 

@@ -18,29 +18,31 @@ use domain::ports::oauth::{OAuthError, OAuthPort, OAuthToken};
 use std::sync::Arc;
 use tracing::{error, info, instrument, warn};
 
-pub struct UserInfoSyncJobHandler<TAuthenticatedUserRepository> {
-    oauth_port: Arc<dyn OAuthPort + Send + Sync>,
+pub struct UserInfoSyncJobHandler<TAuthenticatedUserRepository, TOAuthAdapter> {
     authenticated_user_repository: TAuthenticatedUserRepository,
     role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
     user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
+    oauth_port: TOAuthAdapter,
 }
 
-impl<TAuthenticatedUserRepository> UserInfoSyncJobHandler<TAuthenticatedUserRepository>
+impl<TAuthenticatedUserRepository, TOAuthAdapter>
+    UserInfoSyncJobHandler<TAuthenticatedUserRepository, TOAuthAdapter>
 where
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+    TOAuthAdapter: OAuthPort + Send + Sync,
 {
     #[instrument(level = "trace", skip_all)]
     pub fn new(
-        oauth_port: Arc<dyn OAuthPort + Send + Sync>,
         authenticated_user_repository: TAuthenticatedUserRepository,
         role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
         user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
+        oauth_port: TOAuthAdapter,
     ) -> Self {
         Self {
-            oauth_port,
             authenticated_user_repository,
             role_sync_requested_repository,
             user_info_sync_requested_repository,
+            oauth_port,
         }
     }
 
@@ -155,10 +157,11 @@ where
 }
 
 #[async_trait]
-impl<TAuthenticatedUserRepository> UserInfoSyncJobHandlerPort
-    for UserInfoSyncJobHandler<TAuthenticatedUserRepository>
+impl<TAuthenticatedUserRepository, TOAuthAdapter> UserInfoSyncJobHandlerPort
+    for UserInfoSyncJobHandler<TAuthenticatedUserRepository, TOAuthAdapter>
 where
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+    TOAuthAdapter: OAuthPort + Send + Sync,
 {
     #[instrument(level = "debug", skip_all)]
     async fn tick(&self) -> Result<(), UserInfoSyncJobHandlerError> {
