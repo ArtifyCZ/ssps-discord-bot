@@ -120,7 +120,7 @@ impl Locator for ApplicationPortLocator {
         RoleSyncJobHandler::new(
             self.discord_adapter(),
             self.authenticated_user_repository(),
-            self.role_sync_requested_repository_arc(),
+            self.role_sync_requested_repository(),
             self.everyone_roles.clone(),
             self.additional_student_roles.clone(),
             self.unknown_class_role_id,
