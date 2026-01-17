@@ -14,20 +14,22 @@ use domain_shared::discord::UserId;
 use std::sync::Arc;
 use tracing::{info, instrument, warn};
 
-pub struct UserService<TAuthenticatedUserRepository> {
+pub struct UserService<TAuthenticatedUserRepository, TRoleSyncRequestedRepository> {
     authenticated_user_repository: TAuthenticatedUserRepository,
-    role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
+    role_sync_requested_repository: TRoleSyncRequestedRepository,
     user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
 }
 
-impl<TAuthenticatedUserRepository> UserService<TAuthenticatedUserRepository>
+impl<TAuthenticatedUserRepository, TRoleSyncRequestedRepository>
+    UserService<TAuthenticatedUserRepository, TRoleSyncRequestedRepository>
 where
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+    TRoleSyncRequestedRepository: RoleSyncRequestedRepository + Send + Sync,
 {
     #[instrument(level = "trace", skip_all)]
     pub fn new(
         authenticated_user_repository: TAuthenticatedUserRepository,
-        role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
+        role_sync_requested_repository: TRoleSyncRequestedRepository,
         user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
     ) -> Self {
         Self {
@@ -39,9 +41,11 @@ where
 }
 
 #[async_trait]
-impl<TAuthenticatedUserRepository> UserPort for UserService<TAuthenticatedUserRepository>
+impl<TAuthenticatedUserRepository, TRoleSyncRequestedRepository> UserPort
+    for UserService<TAuthenticatedUserRepository, TRoleSyncRequestedRepository>
 where
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+    TRoleSyncRequestedRepository: RoleSyncRequestedRepository + Send + Sync,
 {
     #[instrument(level = "info", skip(self))]
     async fn get_user_info(

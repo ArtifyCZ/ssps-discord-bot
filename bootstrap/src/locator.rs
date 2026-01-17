@@ -67,13 +67,6 @@ impl ApplicationPortLocator {
     }
 
     #[instrument(level = "trace", skip(self))]
-    fn role_sync_requested_repository_arc(
-        &self,
-    ) -> Arc<impl RoleSyncRequestedRepository + Send + Sync> {
-        Arc::new(self.role_sync_requested_repository())
-    }
-
-    #[instrument(level = "trace", skip(self))]
     fn user_authentication_request_repository(
         &self,
     ) -> impl UserAuthenticationRequestRepository + Send + Sync {
@@ -148,7 +141,7 @@ impl Locator for ApplicationPortLocator {
     fn create_user_port(&self) -> impl UserPort + Send + Sync {
         UserService::new(
             self.authenticated_user_repository(),
-            self.role_sync_requested_repository_arc(),
+            self.role_sync_requested_repository(),
             self.user_info_sync_requested_repository.clone(),
         )
     }
