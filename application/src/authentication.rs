@@ -22,7 +22,6 @@ use domain::jobs::user_info_sync_job::{
 use domain::ports::oauth::{OAuthError, OAuthPort};
 use domain_shared::authentication::{AuthenticationLink, ClientCallbackToken, CsrfToken};
 use domain_shared::discord::UserId;
-use std::sync::Arc;
 use tracing::{error, info, instrument, warn, Span};
 
 pub struct AuthenticationService<
@@ -30,13 +29,14 @@ pub struct AuthenticationService<
     TAuthenticatedUserRepository,
     TRoleSyncRequestedRepository,
     TUserAuthenticationRequestRepository,
+    TUserInfoSyncRequestedRepository,
     TOAuthAdapter,
 > {
     pub archived_authenticated_user_repository: TArchivedAuthenticatedUserRepository,
     pub authenticated_user_repository: TAuthenticatedUserRepository,
     pub role_sync_requested_repository: TRoleSyncRequestedRepository,
     pub user_authentication_request_repository: TUserAuthenticationRequestRepository,
-    pub user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
+    pub user_info_sync_requested_repository: TUserInfoSyncRequestedRepository,
     pub oauth_port: TOAuthAdapter,
     pub invite_link: InviteLink,
 }
@@ -47,6 +47,7 @@ impl<
         TAuthenticatedUserRepository,
         TRoleSyncRequestedRepository,
         TUserAuthenticationRequestRepository,
+        TUserInfoSyncRequestedRepository,
         TOAuthAdapter,
     > AuthenticationPort
     for AuthenticationService<
@@ -54,6 +55,7 @@ impl<
         TAuthenticatedUserRepository,
         TRoleSyncRequestedRepository,
         TUserAuthenticationRequestRepository,
+        TUserInfoSyncRequestedRepository,
         TOAuthAdapter,
     >
 where
@@ -61,6 +63,7 @@ where
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
     TRoleSyncRequestedRepository: RoleSyncRequestedRepository + Send + Sync,
     TUserAuthenticationRequestRepository: UserAuthenticationRequestRepository + Send + Sync,
+    TUserInfoSyncRequestedRepository: UserInfoSyncRequestedRepository + Send + Sync,
     TOAuthAdapter: OAuthPort + Send + Sync,
 {
     #[instrument(level = "info", skip(self))]
