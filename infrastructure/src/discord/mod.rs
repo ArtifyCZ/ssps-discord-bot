@@ -19,29 +19,28 @@ use poise::serenity_prelude::GuildId;
 use serenity::all::{Builder, Http};
 use serenity::futures::StreamExt;
 use std::ops::Not;
-use std::sync::Arc;
 use tracing::{error, instrument, warn};
 
-pub struct DiscordAdapter {
-    client: Arc<Http>,
+pub struct DiscordAdapter<'a> {
+    client: &'a Http,
     guild_id: GuildId,
 }
 
-impl DiscordAdapter {
+impl<'a> DiscordAdapter<'a> {
     #[instrument(level = "trace", skip_all)]
-    pub fn new(client: Arc<Http>, guild_id: GuildId) -> Self {
+    pub fn new(client: &'a Http, guild_id: GuildId) -> Self {
         Self { client, guild_id }
     }
 }
 
 #[async_trait]
-impl DiscordPort for DiscordAdapter {
+impl<'a> DiscordPort for DiscordAdapter<'a> {
     #[instrument(level = "debug", err, skip(self, channel_id, message))]
     async fn send_message(&self, channel_id: ChannelId, message: CreateMessage) -> Result<()> {
         let message = domain_to_serenity_create_message(message);
         let channel_id = domain_to_serenity_channel_id(channel_id);
 
-        message.execute(&self.client, (channel_id, None)).await?;
+        message.execute(self.client, (channel_id, None)).await?;
 
         Ok(())
     }
@@ -116,7 +115,7 @@ impl DiscordPort for DiscordAdapter {
 
             assign_set.push(async move {
                 self.client
-                    .add_member_role(self.guild_id, user_id, role_id, Some(&reason))
+                    .add_member_role(self.guild_id, user_id, role_id, Some(reason))
                     .await
             });
         }
@@ -126,7 +125,7 @@ impl DiscordPort for DiscordAdapter {
 
             remove_set.push(async move {
                 self.client
-                    .remove_member_role(self.guild_id, user_id, role_id, Some(&reason))
+                    .remove_member_role(self.guild_id, user_id, role_id, Some(reason))
                     .await
             });
         }

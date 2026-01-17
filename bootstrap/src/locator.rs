@@ -86,8 +86,8 @@ impl ApplicationPortLocator {
     }
 
     #[instrument(level = "trace", skip(self))]
-    fn discord_adapter(&self) -> impl DiscordPort + Send + Sync {
-        DiscordAdapter::new(self.serenity_client.clone(), self.guild_id)
+    fn discord_adapter(&self) -> impl DiscordPort + Send + Sync + use<'_> {
+        DiscordAdapter::new(&self.serenity_client, self.guild_id)
     }
 
     #[instrument(level = "trace", skip(self))]
