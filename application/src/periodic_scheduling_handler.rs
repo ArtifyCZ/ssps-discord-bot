@@ -18,27 +18,36 @@ use std::sync::Arc;
 use std::vec::IntoIter;
 use tracing::{error, info, instrument};
 
-pub struct PeriodicSchedulingHandler<TDiscordPort, TAuthenticatedUserRepository> {
+pub struct PeriodicSchedulingHandler<
+    TDiscordPort,
+    TAuthenticatedUserRepository,
+    TRoleSyncRequestedRepository,
+> {
     discord_port: TDiscordPort,
     authenticated_user_repository: TAuthenticatedUserRepository,
-    role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
+    role_sync_requested_repository: TRoleSyncRequestedRepository,
     user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
     authenticated_user_ids: IntoIter<UserId>,
     discord_members_chunk: IntoIter<UserId>,
     discord_members_chunk_offset: Option<UserId>,
 }
 
-impl<TDiscordPort, TAuthenticatedUserRepository>
-    PeriodicSchedulingHandler<TDiscordPort, TAuthenticatedUserRepository>
+impl<TDiscordPort, TAuthenticatedUserRepository, TRoleSyncRequestedRepository>
+    PeriodicSchedulingHandler<
+        TDiscordPort,
+        TAuthenticatedUserRepository,
+        TRoleSyncRequestedRepository,
+    >
 where
     TDiscordPort: DiscordPort + Send + Sync,
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+    TRoleSyncRequestedRepository: RoleSyncRequestedRepository + Send + Sync,
 {
     #[instrument(level = "trace", skip_all)]
     pub fn new(
         discord_port: TDiscordPort,
         authenticated_user_repository: TAuthenticatedUserRepository,
-        role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
+        role_sync_requested_repository: TRoleSyncRequestedRepository,
         user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
     ) -> Self {
         Self {
@@ -128,11 +137,17 @@ where
 }
 
 #[async_trait]
-impl<TDiscordPort, TAuthenticatedUserRepository> PeriodicSchedulingHandlerPort
-    for PeriodicSchedulingHandler<TDiscordPort, TAuthenticatedUserRepository>
+impl<TDiscordPort, TAuthenticatedUserRepository, TRoleSyncRequestedRepository>
+    PeriodicSchedulingHandlerPort
+    for PeriodicSchedulingHandler<
+        TDiscordPort,
+        TAuthenticatedUserRepository,
+        TRoleSyncRequestedRepository,
+    >
 where
     TDiscordPort: DiscordPort + Send + Sync,
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
+    TRoleSyncRequestedRepository: RoleSyncRequestedRepository + Send + Sync,
 {
     #[instrument(level = "debug", skip_all)]
     async fn tick(&mut self) -> Result<(), PeriodicSchedulingHandlerError> {
