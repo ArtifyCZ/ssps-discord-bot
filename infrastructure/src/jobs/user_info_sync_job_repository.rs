@@ -4,19 +4,17 @@ use domain::jobs::user_info_sync_job::{
 };
 use domain_shared::discord::UserId;
 use sqlx::{query, PgPool};
+use tokio::sync::mpsc;
 use tracing::{instrument, warn};
 
 pub struct PostgresUserInfoSyncRequestedRepository<'a> {
     pool: &'a PgPool,
-    user_info_sync_job_wake_tx: tokio::sync::mpsc::Sender<()>,
+    user_info_sync_job_wake_tx: &'a mpsc::Sender<()>,
 }
 
 impl<'a> PostgresUserInfoSyncRequestedRepository<'a> {
     #[instrument(level = "trace", skip_all)]
-    pub fn new(
-        pool: &'a PgPool,
-        user_info_sync_job_wake_tx: tokio::sync::mpsc::Sender<()>,
-    ) -> Self {
+    pub fn new(pool: &'a PgPool, user_info_sync_job_wake_tx: &'a mpsc::Sender<()>) -> Self {
         Self {
             pool,
             user_info_sync_job_wake_tx,

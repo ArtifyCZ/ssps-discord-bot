@@ -81,7 +81,7 @@ impl ApplicationPortLocator {
     ) -> impl UserInfoSyncRequestedRepository + Send + Sync + use<'_> {
         PostgresUserInfoSyncRequestedRepository::new(
             &self.postgres_pool,
-            self.user_info_sync_job_wake_tx.clone(),
+            &self.user_info_sync_job_wake_tx,
         )
     }
 
