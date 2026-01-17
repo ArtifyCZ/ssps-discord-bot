@@ -1,20 +1,19 @@
-use async_trait::async_trait;
+use core::future::Future;
 use domain_shared::authentication::{AuthenticationLink, ClientCallbackToken, CsrfToken};
 use domain_shared::discord::{InviteLink, UserId};
 use thiserror::Error;
 use tracing::error;
 
-#[async_trait]
 pub trait AuthenticationPort {
-    async fn create_authentication_link(
-        &self,
+    fn create_authentication_link<'a>(
+        &'a self,
         user_id: UserId,
-    ) -> Result<AuthenticationLink, AuthenticationError>;
-    async fn confirm_authentication(
-        &self,
+    ) -> impl Future<Output = Result<AuthenticationLink, AuthenticationError>> + Send + 'a;
+    fn confirm_authentication<'a>(
+        &'a self,
         csrf_token: CsrfToken,
         client_callback_token: ClientCallbackToken,
-    ) -> Result<(UserId, &InviteLink), AuthenticationError>;
+    ) -> impl Future<Output = Result<(UserId, &'a InviteLink), AuthenticationError>> + Send + 'a;
 }
 
 #[derive(Debug, Error)]

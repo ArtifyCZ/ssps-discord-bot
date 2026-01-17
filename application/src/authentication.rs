@@ -1,6 +1,5 @@
 use application_ports::authentication::{AuthenticationError, AuthenticationPort};
 use application_ports::discord::InviteLink;
-use async_trait::async_trait;
 use domain::authentication::archived_authenticated_user::{
     create_archived_authenticated_user_from_user, ArchivedAuthenticatedUserRepository,
     ArchivedAuthenticatedUserRepositoryError,
@@ -42,7 +41,6 @@ pub struct AuthenticationService<
     pub invite_link: &'a InviteLink,
 }
 
-#[async_trait]
 impl<
         'a,
         TArchivedAuthenticatedUserRepository,
