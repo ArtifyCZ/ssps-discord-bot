@@ -13,6 +13,7 @@ use application_ports::user_info_sync_job_handler::UserInfoSyncJobHandlerPort;
 use domain::authentication::archived_authenticated_user::ArchivedAuthenticatedUserRepository;
 use domain::authentication::authenticated_user::AuthenticatedUserRepository;
 use domain::authentication::user_authentication_request::UserAuthenticationRequestRepository;
+use domain::jobs::role_sync_job::RoleSyncRequestedRepository;
 use domain::ports::discord::DiscordPort;
 use domain::ports::oauth::OAuthPort;
 use domain_shared::discord::{InviteLink, RoleId};
@@ -57,6 +58,13 @@ impl ApplicationPortLocator {
     }
 
     #[instrument(level = "trace", skip(self))]
+    fn role_sync_requested_repository_arc(
+        &self,
+    ) -> Arc<impl RoleSyncRequestedRepository + Send + Sync> {
+        self.role_sync_requested_repository.clone()
+    }
+
+    #[instrument(level = "trace", skip(self))]
     fn user_authentication_request_repository(
         &self,
     ) -> impl UserAuthenticationRequestRepository + Send + Sync {
@@ -83,7 +91,7 @@ impl Locator for ApplicationPortLocator {
             authenticated_user_repository: self.authenticated_user_repository(),
             user_authentication_request_repository: self.user_authentication_request_repository(),
             user_info_sync_requested_repository: self.user_info_sync_requested_repository.clone(),
-            role_sync_requested_repository: self.role_sync_requested_repository.clone(),
+            role_sync_requested_repository: self.role_sync_requested_repository_arc(),
             invite_link: self.invite_link.clone(),
         }
     }
@@ -93,7 +101,7 @@ impl Locator for ApplicationPortLocator {
         PeriodicSchedulingHandler::new(
             self.discord_adapter(),
             self.authenticated_user_repository(),
-            self.role_sync_requested_repository.clone(),
+            self.role_sync_requested_repository_arc(),
             self.user_info_sync_requested_repository.clone(),
         )
     }
@@ -103,7 +111,7 @@ impl Locator for ApplicationPortLocator {
         RoleSyncJobHandler::new(
             self.discord_adapter(),
             self.authenticated_user_repository(),
-            self.role_sync_requested_repository.clone(),
+            self.role_sync_requested_repository_arc(),
             self.everyone_roles.clone(),
             self.additional_student_roles.clone(),
             self.unknown_class_role_id,
@@ -116,7 +124,7 @@ impl Locator for ApplicationPortLocator {
     ) -> impl UserInfoSyncJobHandlerPort + Send + Sync {
         UserInfoSyncJobHandler::new(
             self.authenticated_user_repository(),
-            self.role_sync_requested_repository.clone(),
+            self.role_sync_requested_repository_arc(),
             self.user_info_sync_requested_repository.clone(),
             self.oauth_adapter(),
         )
@@ -131,7 +139,7 @@ impl Locator for ApplicationPortLocator {
     fn create_user_port(&self) -> impl UserPort + Send + Sync {
         UserService::new(
             self.authenticated_user_repository(),
-            self.role_sync_requested_repository.clone(),
+            self.role_sync_requested_repository_arc(),
             self.user_info_sync_requested_repository.clone(),
         )
     }
