@@ -7,19 +7,19 @@ use domain_shared::authentication::CsrfToken;
 use sqlx::{query, PgPool};
 use tracing::{instrument, warn};
 
-pub struct PostgresUserAuthenticationRequestRepository {
-    pool: PgPool,
+pub struct PostgresUserAuthenticationRequestRepository<'a> {
+    pool: &'a PgPool,
 }
 
-impl PostgresUserAuthenticationRequestRepository {
+impl<'a> PostgresUserAuthenticationRequestRepository<'a> {
     #[instrument(level = "trace", skip_all)]
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: &'a PgPool) -> Self {
         Self { pool }
     }
 }
 
 #[async_trait]
-impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRepository {
+impl<'a> UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRepository<'a> {
     #[instrument(level = "debug", err, skip(self, request))]
     async fn save(
         &self,
@@ -39,7 +39,7 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
             user_id.0 as i64,
             requested_at.naive_utc(),
             confirmed_at.map(|t| t.naive_utc()),
-        ).execute(&self.pool).await.map_err(map_err)?;
+        ).execute(self.pool).await.map_err(map_err)?;
 
         Ok(())
     }
@@ -53,7 +53,7 @@ impl UserAuthenticationRequestRepository for PostgresUserAuthenticationRequestRe
             "SELECT csrf_token, user_id, requested_at, confirmed_at FROM user_authentication_requests WHERE csrf_token = $1",
             csrf_token.0,
         )
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.pool)
         .await.map_err(map_err)?;
 
         if let Some(row) = row {

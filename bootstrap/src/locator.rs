@@ -74,8 +74,8 @@ impl ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
     fn user_authentication_request_repository(
         &self,
-    ) -> impl UserAuthenticationRequestRepository + Send + Sync {
-        PostgresUserAuthenticationRequestRepository::new(self.postgres_pool.clone())
+    ) -> impl UserAuthenticationRequestRepository + Send + Sync + use<'_> {
+        PostgresUserAuthenticationRequestRepository::new(&self.postgres_pool)
     }
 
     #[instrument(level = "trace", skip(self))]
