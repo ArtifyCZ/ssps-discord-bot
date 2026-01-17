@@ -9,7 +9,6 @@ use crate::discord::channel_id::domain_to_serenity_channel_id;
 use crate::discord::create_message::domain_to_serenity_create_message;
 use crate::discord::role_id::{domain_to_serenity_role_id, serenity_to_domain_role_id};
 use crate::discord::user_id::{domain_to_serenity_user_id, serenity_to_domain_user_id};
-use async_trait::async_trait;
 use domain::ports::discord::{ChannelId, CreateMessage, DiscordPort, Role, RoleDiff};
 use domain::ports::discord::{DiscordError, Result};
 use domain_shared::discord::{RoleId, UserId};
@@ -33,7 +32,6 @@ impl<'a> DiscordAdapter<'a> {
     }
 }
 
-#[async_trait]
 impl<'a> DiscordPort for DiscordAdapter<'a> {
     #[instrument(level = "debug", err, skip(self, channel_id, message))]
     async fn send_message(&self, channel_id: ChannelId, message: CreateMessage) -> Result<()> {
