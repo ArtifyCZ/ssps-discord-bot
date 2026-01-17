@@ -1,13 +1,12 @@
-use async_trait::async_trait;
 use domain_shared::discord::ChannelId;
+use std::future::Future;
 use tracing::{error, instrument};
 
-#[async_trait]
 pub trait InformationChannelPort {
-    async fn update_information(
+    fn update_information(
         &self,
         channel_id: ChannelId,
-    ) -> Result<(), InformationChannelError>;
+    ) -> impl Future<Output = Result<(), InformationChannelError>> + Send;
 }
 
 pub enum InformationChannelError {

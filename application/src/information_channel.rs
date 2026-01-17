@@ -1,6 +1,5 @@
 use application_ports::discord::ChannelId;
 use application_ports::information_channel::{InformationChannelError, InformationChannelPort};
-use async_trait::async_trait;
 use domain::ports::discord::DiscordPort;
 use tracing::{info, instrument};
 
@@ -18,7 +17,6 @@ where
     }
 }
 
-#[async_trait]
 impl<TDiscordPort> InformationChannelPort for InformationChannelService<TDiscordPort>
 where
     TDiscordPort: DiscordPort + Sync + Send,
