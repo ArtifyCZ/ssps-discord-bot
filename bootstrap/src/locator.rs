@@ -62,9 +62,11 @@ impl ApplicationPortLocator {
     }
 
     #[instrument(level = "trace", skip(self))]
-    fn role_sync_requested_repository(&self) -> impl RoleSyncRequestedRepository + Send + Sync {
+    fn role_sync_requested_repository(
+        &self,
+    ) -> impl RoleSyncRequestedRepository + Send + Sync + use<'_> {
         PostgresRoleSyncRequestedRepository::new(
-            self.postgres_pool.clone(),
+            &self.postgres_pool,
             self.role_sync_job_wake_tx.clone(),
         )
     }

@@ -6,14 +6,14 @@ use domain_shared::discord::UserId;
 use sqlx::{query, PgPool};
 use tracing::{instrument, warn};
 
-pub struct PostgresRoleSyncRequestedRepository {
-    pool: PgPool,
+pub struct PostgresRoleSyncRequestedRepository<'a> {
+    pool: &'a PgPool,
     role_sync_job_wake_tx: tokio::sync::mpsc::Sender<()>,
 }
 
-impl PostgresRoleSyncRequestedRepository {
+impl<'a> PostgresRoleSyncRequestedRepository<'a> {
     #[instrument(level = "trace", skip_all)]
-    pub fn new(pool: PgPool, role_sync_job_wake_tx: tokio::sync::mpsc::Sender<()>) -> Self {
+    pub fn new(pool: &'a PgPool, role_sync_job_wake_tx: tokio::sync::mpsc::Sender<()>) -> Self {
         Self {
             pool,
             role_sync_job_wake_tx,
@@ -22,7 +22,7 @@ impl PostgresRoleSyncRequestedRepository {
 }
 
 #[async_trait]
-impl RoleSyncRequestedRepository for PostgresRoleSyncRequestedRepository {
+impl<'a> RoleSyncRequestedRepository for PostgresRoleSyncRequestedRepository<'a> {
     #[instrument(level = "debug", err, skip_all)]
     async fn save(
         &self,
@@ -40,7 +40,7 @@ impl RoleSyncRequestedRepository for PostgresRoleSyncRequestedRepository {
                 request.user_id.0 as i64,
                 request.queued_at.naive_utc(),
             )
-        }.execute(&self.pool).await.map_err(|err| {
+        }.execute(self.pool).await.map_err(|err| {
             warn!(error = ?err, "Failed to save role sync request");
             RoleSyncRequestedRepositoryError::ServiceUnavailable
         })?;
@@ -61,7 +61,7 @@ impl RoleSyncRequestedRepository for PostgresRoleSyncRequestedRepository {
                 "SELECT user_id, queued_at, low_priority FROM role_sync_requested WHERE low_priority = $1 ORDER BY queued_at LIMIT 1",
                 low_priority,
             )
-                .fetch_optional(&self.pool)
+                .fetch_optional(self.pool)
                 .await
                 .map_err(|err| {
                     warn!(error = ?err, "Failed to fetch oldest role sync request");
@@ -74,7 +74,7 @@ impl RoleSyncRequestedRepository for PostgresRoleSyncRequestedRepository {
                 row.user_id as i64,
                 row.low_priority,
             )
-            .execute(&self.pool)
+            .execute(self.pool)
             .await
             .map_err(|err| {
                 warn!(error = ?err, "Failed to pop oldest role sync request");
