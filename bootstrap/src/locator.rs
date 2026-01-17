@@ -85,13 +85,6 @@ impl ApplicationPortLocator {
     }
 
     #[instrument(level = "trace", skip(self))]
-    fn user_info_sync_requested_repository_arc(
-        &self,
-    ) -> Arc<impl UserInfoSyncRequestedRepository + Send + Sync> {
-        Arc::new(self.user_info_sync_requested_repository())
-    }
-
-    #[instrument(level = "trace", skip(self))]
     fn discord_adapter(&self) -> impl DiscordPort + Send + Sync {
         DiscordAdapter::new(self.serenity_client.clone(), self.guild_id)
     }
@@ -145,7 +138,7 @@ impl Locator for ApplicationPortLocator {
         UserInfoSyncJobHandler::new(
             self.authenticated_user_repository(),
             self.role_sync_requested_repository(),
-            self.user_info_sync_requested_repository_arc(),
+            self.user_info_sync_requested_repository(),
             self.oauth_adapter(),
         )
     }
