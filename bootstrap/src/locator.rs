@@ -122,7 +122,7 @@ impl Locator for ApplicationPortLocator {
             self.discord_adapter(),
             self.authenticated_user_repository(),
             self.role_sync_requested_repository(),
-            self.user_info_sync_requested_repository_arc(),
+            self.user_info_sync_requested_repository(),
         )
     }
 
