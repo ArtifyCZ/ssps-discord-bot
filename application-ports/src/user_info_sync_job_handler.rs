@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use thiserror::Error;
-use tracing::error;
 
 #[async_trait]
 pub trait UserInfoSyncJobHandlerPort {

@@ -2,7 +2,6 @@ use core::future::Future;
 use domain_shared::authentication::{AuthenticationLink, ClientCallbackToken, CsrfToken};
 use domain_shared::discord::{InviteLink, UserId};
 use thiserror::Error;
-use tracing::error;
 
 pub trait AuthenticationPort {
     fn create_authentication_link<'a>(

@@ -2,7 +2,6 @@ use chrono::Duration;
 use domain_shared::discord::UserId;
 use std::future::Future;
 use thiserror::Error;
-use tracing::error;
 
 pub trait UserPort {
     fn get_user_info(
