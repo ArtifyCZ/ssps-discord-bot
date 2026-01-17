@@ -29,13 +29,14 @@ pub struct AuthenticationService<
     TArchivedAuthenticatedUserRepository,
     TAuthenticatedUserRepository,
     TUserAuthenticationRequestRepository,
+    TOAuthAdapter,
 > {
-    pub oauth_port: Arc<dyn OAuthPort + Send + Sync>,
     pub archived_authenticated_user_repository: TArchivedAuthenticatedUserRepository,
     pub authenticated_user_repository: TAuthenticatedUserRepository,
     pub user_authentication_request_repository: TUserAuthenticationRequestRepository,
     pub user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
     pub role_sync_requested_repository: Arc<dyn RoleSyncRequestedRepository + Send + Sync>,
+    pub oauth_port: TOAuthAdapter,
     pub invite_link: InviteLink,
 }
 
@@ -44,16 +45,19 @@ impl<
         TArchivedAuthenticatedUserRepository,
         TAuthenticatedUserRepository,
         TUserAuthenticationRequestRepository,
+        TOAuthAdapter,
     > AuthenticationPort
     for AuthenticationService<
         TArchivedAuthenticatedUserRepository,
         TAuthenticatedUserRepository,
         TUserAuthenticationRequestRepository,
+        TOAuthAdapter,
     >
 where
     TArchivedAuthenticatedUserRepository: ArchivedAuthenticatedUserRepository + Send + Sync,
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
     TUserAuthenticationRequestRepository: UserAuthenticationRequestRepository + Send + Sync,
+    TOAuthAdapter: OAuthPort + Send + Sync,
 {
     #[instrument(level = "info", skip(self))]
     async fn create_authentication_link(

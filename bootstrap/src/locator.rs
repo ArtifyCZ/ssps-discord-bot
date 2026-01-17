@@ -83,7 +83,7 @@ impl Locator for ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
     fn create_authentication_port(&self) -> impl AuthenticationPort + Send + Sync {
         AuthenticationService {
-            oauth_port: self.oauth_adapter_arc(),
+            oauth_port: self.oauth_adapter(),
             archived_authenticated_user_repository: self.archived_authenticated_user_repository(),
             authenticated_user_repository: self.authenticated_user_repository(),
             user_authentication_request_repository: self.user_authentication_request_repository(),
