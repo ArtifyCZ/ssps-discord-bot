@@ -1,5 +1,4 @@
 use application_ports::role_sync_job_handler::{RoleSyncJobHandlerError, RoleSyncJobHandlerPort};
-use async_trait::async_trait;
 use chrono::{Duration, TimeDelta};
 use domain::authentication::authenticated_user::{
     AuthenticatedUserRepository, AuthenticatedUserRepositoryError,
@@ -140,7 +139,6 @@ where
     }
 }
 
-#[async_trait]
 impl<TDiscordPort, TAuthenticatedUserRepository, TRoleSyncRequestedRepository>
     RoleSyncJobHandlerPort
     for RoleSyncJobHandler<TDiscordPort, TAuthenticatedUserRepository, TRoleSyncRequestedRepository>

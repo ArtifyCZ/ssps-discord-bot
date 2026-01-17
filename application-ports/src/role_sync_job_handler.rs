@@ -1,10 +1,8 @@
-use async_trait::async_trait;
+use std::future::Future;
 use thiserror::Error;
-use tracing::error;
 
-#[async_trait]
 pub trait RoleSyncJobHandlerPort {
-    async fn tick(&mut self) -> Result<(), RoleSyncJobHandlerError>;
+    fn tick(&mut self) -> impl Future<Output = Result<(), RoleSyncJobHandlerError>> + Send;
 }
 
 #[derive(Debug, Error)]
