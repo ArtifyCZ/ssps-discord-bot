@@ -14,6 +14,7 @@ use domain::authentication::archived_authenticated_user::ArchivedAuthenticatedUs
 use domain::authentication::authenticated_user::AuthenticatedUserRepository;
 use domain::authentication::user_authentication_request::UserAuthenticationRequestRepository;
 use domain::ports::discord::DiscordPort;
+use domain::ports::oauth::OAuthPort;
 use domain_shared::discord::{InviteLink, RoleId};
 use infrastructure::authentication::archived_authenticated_user::PostgresArchivedAuthenticatedUserRepository;
 use infrastructure::authentication::authenticated_user::PostgresAuthenticatedUserRepository;
@@ -37,8 +38,8 @@ pub struct ApplicationPortLocator {
 
     pub(crate) oauth_adapter: Arc<OAuthAdapter>,
     pub(crate) role_sync_requested_repository: Arc<PostgresRoleSyncRequestedRepository>,
-    pub(crate) user_info_sync_requested_repository: Arc<PostgresUserInfoSyncRequestedRepository>,
 
+    pub(crate) user_info_sync_requested_repository: Arc<PostgresUserInfoSyncRequestedRepository>,
     pub(crate) postgres_pool: sqlx::PgPool,
     pub(crate) serenity_client: Arc<serenity::http::Http>,
 }
@@ -67,13 +68,18 @@ impl ApplicationPortLocator {
     fn discord_adapter(&self) -> impl DiscordPort + Send + Sync {
         DiscordAdapter::new(self.serenity_client.clone(), self.guild_id)
     }
+
+    #[instrument(level = "trace", skip(self))]
+    fn oauth_adapter_arc(&self) -> Arc<impl OAuthPort + Send + Sync> {
+        self.oauth_adapter.clone()
+    }
 }
 
 impl Locator for ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
     fn create_authentication_port(&self) -> impl AuthenticationPort + Send + Sync {
         AuthenticationService {
-            oauth_port: self.oauth_adapter.clone(),
+            oauth_port: self.oauth_adapter_arc(),
             archived_authenticated_user_repository: self.archived_authenticated_user_repository(),
             authenticated_user_repository: self.authenticated_user_repository(),
             user_authentication_request_repository: self.user_authentication_request_repository(),
@@ -110,7 +116,7 @@ impl Locator for ApplicationPortLocator {
         &self,
     ) -> impl UserInfoSyncJobHandlerPort + Send + Sync {
         UserInfoSyncJobHandler::new(
-            self.oauth_adapter.clone(),
+            self.oauth_adapter_arc(),
             self.authenticated_user_repository(),
             self.role_sync_requested_repository.clone(),
             self.user_info_sync_requested_repository.clone(),
