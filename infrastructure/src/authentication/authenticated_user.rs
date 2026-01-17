@@ -9,13 +9,13 @@ use domain_shared::discord::UserId;
 use sqlx::{query, PgPool};
 use tracing::{instrument, warn};
 
-pub struct PostgresAuthenticatedUserRepository {
-    pool: PgPool,
+pub struct PostgresAuthenticatedUserRepository<'a> {
+    pool: &'a PgPool,
 }
 
-impl PostgresAuthenticatedUserRepository {
+impl<'a> PostgresAuthenticatedUserRepository<'a> {
     #[instrument(level = "trace", skip_all)]
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: &'a PgPool) -> Self {
         Self { pool }
     }
 }
@@ -38,7 +38,7 @@ macro_rules! record_to_user {
 }
 
 #[async_trait]
-impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
+impl<'a> AuthenticatedUserRepository for PostgresAuthenticatedUserRepository<'a> {
     #[instrument(level = "debug", err, skip(self, user))]
     async fn save(&self, user: &AuthenticatedUser) -> Result<(), AuthenticatedUserRepositoryError> {
         let AuthenticatedUserSnapshot {
@@ -69,7 +69,7 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
             refresh_token.0,
             class_id,
             authenticated_at.naive_utc(),
-        ).execute(&self.pool).await.map_err(map_err)?;
+        ).execute(self.pool).await.map_err(map_err)?;
 
         Ok(())
     }
@@ -80,7 +80,7 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
             "DELETE FROM authenticated_users WHERE user_id = $1",
             user_id.0 as i64,
         )
-        .execute(&self.pool)
+        .execute(self.pool)
         .await
         .map_err(map_err)?;
 
@@ -91,7 +91,7 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
     async fn find_all(&self) -> Result<Vec<AuthenticatedUser>, AuthenticatedUserRepositoryError> {
         let rows = query!(
             "SELECT user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at FROM authenticated_users",
-        ).fetch_all(&self.pool).await.map_err(map_err)?;
+        ).fetch_all(self.pool).await.map_err(map_err)?;
         let users = rows.into_iter().map(|row| record_to_user!(row)).collect();
         Ok(users)
     }
@@ -104,7 +104,7 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
         let row = query!(
             "SELECT user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at FROM authenticated_users WHERE user_id = $1",
             user_id.0 as i64,
-        ).fetch_optional(&self.pool).await.map_err(map_err)?;
+        ).fetch_optional(self.pool).await.map_err(map_err)?;
 
         if let Some(row) = row {
             Ok(Some(record_to_user!(row)))
@@ -121,7 +121,7 @@ impl AuthenticatedUserRepository for PostgresAuthenticatedUserRepository {
         let row = query!(
             "SELECT user_id, name, email, access_token, access_token_expires_at, refresh_token, class_id, authenticated_at FROM authenticated_users WHERE email = $1",
             email,
-        ).fetch_optional(&self.pool).await.map_err(map_err)?;
+        ).fetch_optional(self.pool).await.map_err(map_err)?;
 
         if let Some(row) = row {
             Ok(Some(record_to_user!(row)))

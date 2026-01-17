@@ -48,8 +48,10 @@ pub struct ApplicationPortLocator {
 
 impl ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
-    fn authenticated_user_repository(&self) -> impl AuthenticatedUserRepository + Send + Sync {
-        PostgresAuthenticatedUserRepository::new(self.postgres_pool.clone())
+    fn authenticated_user_repository(
+        &self,
+    ) -> impl AuthenticatedUserRepository + Send + Sync + use<'_> {
+        PostgresAuthenticatedUserRepository::new(&self.postgres_pool)
     }
 
     #[instrument(level = "trace", skip(self))]
