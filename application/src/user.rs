@@ -11,26 +11,38 @@ use domain::jobs::user_info_sync_job::{
     request_user_info_sync, UserInfoSyncRequestedRepository, UserInfoSyncRequestedRepositoryError,
 };
 use domain_shared::discord::UserId;
-use std::sync::Arc;
 use tracing::{info, instrument, warn};
 
-pub struct UserService<TAuthenticatedUserRepository, TRoleSyncRequestedRepository> {
+pub struct UserService<
+    TAuthenticatedUserRepository,
+    TRoleSyncRequestedRepository,
+    TUserInfoSyncRequestedRepository,
+> {
     authenticated_user_repository: TAuthenticatedUserRepository,
     role_sync_requested_repository: TRoleSyncRequestedRepository,
-    user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
+    user_info_sync_requested_repository: TUserInfoSyncRequestedRepository,
 }
 
-impl<TAuthenticatedUserRepository, TRoleSyncRequestedRepository>
-    UserService<TAuthenticatedUserRepository, TRoleSyncRequestedRepository>
+impl<
+        TAuthenticatedUserRepository,
+        TRoleSyncRequestedRepository,
+        TUserInfoSyncRequestedRepository,
+    >
+    UserService<
+        TAuthenticatedUserRepository,
+        TRoleSyncRequestedRepository,
+        TUserInfoSyncRequestedRepository,
+    >
 where
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
     TRoleSyncRequestedRepository: RoleSyncRequestedRepository + Send + Sync,
+    TUserInfoSyncRequestedRepository: UserInfoSyncRequestedRepository + Send + Sync,
 {
     #[instrument(level = "trace", skip_all)]
     pub fn new(
         authenticated_user_repository: TAuthenticatedUserRepository,
         role_sync_requested_repository: TRoleSyncRequestedRepository,
-        user_info_sync_requested_repository: Arc<dyn UserInfoSyncRequestedRepository + Send + Sync>,
+        user_info_sync_requested_repository: TUserInfoSyncRequestedRepository,
     ) -> Self {
         Self {
             authenticated_user_repository,
@@ -41,11 +53,20 @@ where
 }
 
 #[async_trait]
-impl<TAuthenticatedUserRepository, TRoleSyncRequestedRepository> UserPort
-    for UserService<TAuthenticatedUserRepository, TRoleSyncRequestedRepository>
+impl<
+        TAuthenticatedUserRepository,
+        TRoleSyncRequestedRepository,
+        TUserInfoSyncRequestedRepository,
+    > UserPort
+    for UserService<
+        TAuthenticatedUserRepository,
+        TRoleSyncRequestedRepository,
+        TUserInfoSyncRequestedRepository,
+    >
 where
     TAuthenticatedUserRepository: AuthenticatedUserRepository + Send + Sync,
     TRoleSyncRequestedRepository: RoleSyncRequestedRepository + Send + Sync,
+    TUserInfoSyncRequestedRepository: UserInfoSyncRequestedRepository + Send + Sync,
 {
     #[instrument(level = "info", skip(self))]
     async fn get_user_info(
