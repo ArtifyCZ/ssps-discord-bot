@@ -23,6 +23,9 @@ use serde::Deserialize;
 use std::time::Duration;
 use tracing::{error, instrument, warn};
 
+/**
+ * @TODO: use references instead of cloning where possible to improve performance
+ */
 #[derive(Clone, Debug)]
 pub struct OAuthAdapterConfig {
     pub client_id: ClientId,

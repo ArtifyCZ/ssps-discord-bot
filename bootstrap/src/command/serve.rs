@@ -2,7 +2,7 @@ use crate::locator;
 use anyhow::anyhow;
 use clap::Args;
 use domain_shared::discord::{InviteLink, RoleId};
-use infrastructure::oauth::{OAuthAdapter, OAuthAdapterConfig, TenantId};
+use infrastructure::oauth::{OAuthAdapterConfig, TenantId};
 use oauth2::{ClientId, ClientSecret};
 use presentation::api::run_api;
 use presentation::discord::run_bot;
@@ -97,7 +97,6 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
     let database_connection = sqlx::PgPool::connect(&database_url).await?;
     let serenity_client = ClientBuilder::new(&discord_bot_token, intents).await?.http;
 
-    let oauth_adapter = Arc::new(OAuthAdapter::new(oauth_adapter_config));
     let (role_sync_job_wake_tx, role_sync_job_wake_rx) = tokio::sync::mpsc::channel(24);
     let role_sync_requested_repository = Arc::new(PostgresRoleSyncRequestedRepository::new(
         database_connection.clone(),
@@ -116,8 +115,8 @@ pub async fn run(common_args: CommonArgs, args: ServeArgs) -> anyhow::Result<()>
         unknown_class_role_id,
         invite_link: invite_link.clone(),
         guild_id: guild,
+        oauth_adapter_config,
 
-        oauth_adapter: oauth_adapter.clone(),
         role_sync_requested_repository: role_sync_requested_repository.clone(),
         user_info_sync_requested_repository: user_info_sync_requested_repository.clone(),
 

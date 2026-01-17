@@ -22,7 +22,7 @@ use infrastructure::authentication::user_authentication_request::PostgresUserAut
 use infrastructure::discord::DiscordAdapter;
 use infrastructure::jobs::role_sync_job_repository::PostgresRoleSyncRequestedRepository;
 use infrastructure::jobs::user_info_sync_job_repository::PostgresUserInfoSyncRequestedRepository;
-use infrastructure::oauth::OAuthAdapter;
+use infrastructure::oauth::{OAuthAdapter, OAuthAdapterConfig};
 use presentation::application_ports::Locator;
 use serenity::all::GuildId;
 use std::sync::Arc;
@@ -35,10 +35,9 @@ pub struct ApplicationPortLocator {
     pub(crate) unknown_class_role_id: RoleId,
     pub(crate) invite_link: InviteLink,
     pub(crate) guild_id: GuildId,
+    pub(crate) oauth_adapter_config: OAuthAdapterConfig,
 
-    pub(crate) oauth_adapter: Arc<OAuthAdapter>,
     pub(crate) role_sync_requested_repository: Arc<PostgresRoleSyncRequestedRepository>,
-
     pub(crate) user_info_sync_requested_repository: Arc<PostgresUserInfoSyncRequestedRepository>,
     pub(crate) postgres_pool: sqlx::PgPool,
     pub(crate) serenity_client: Arc<serenity::http::Http>,
@@ -70,8 +69,13 @@ impl ApplicationPortLocator {
     }
 
     #[instrument(level = "trace", skip(self))]
+    fn oauth_adapter(&self) -> impl OAuthPort + Send + Sync {
+        OAuthAdapter::new(self.oauth_adapter_config.clone())
+    }
+
+    #[instrument(level = "trace", skip(self))]
     fn oauth_adapter_arc(&self) -> Arc<impl OAuthPort + Send + Sync> {
-        self.oauth_adapter.clone()
+        Arc::new(self.oauth_adapter())
     }
 }
 
