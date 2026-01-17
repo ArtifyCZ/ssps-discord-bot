@@ -8,19 +8,19 @@ use domain_shared::authentication::ArchivedUserId;
 use sqlx::{query, PgPool};
 use tracing::{instrument, warn};
 
-pub struct PostgresArchivedAuthenticatedUserRepository {
-    pool: PgPool,
+pub struct PostgresArchivedAuthenticatedUserRepository<'a> {
+    pool: &'a PgPool,
 }
 
-impl PostgresArchivedAuthenticatedUserRepository {
+impl<'a> PostgresArchivedAuthenticatedUserRepository<'a> {
     #[instrument(level = "trace", skip_all)]
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: &'a PgPool) -> Self {
         Self { pool }
     }
 }
 
 #[async_trait]
-impl ArchivedAuthenticatedUserRepository for PostgresArchivedAuthenticatedUserRepository {
+impl<'a> ArchivedAuthenticatedUserRepository for PostgresArchivedAuthenticatedUserRepository<'a> {
     #[instrument(level = "debug", err, skip(self, user))]
     async fn save(
         &self,
@@ -51,7 +51,7 @@ impl ArchivedAuthenticatedUserRepository for PostgresArchivedAuthenticatedUserRe
             refresh_token.0,
             class_id,
             authenticated_at.naive_utc(),
-        ).execute(&self.pool).await.map_err(map_err)?;
+        ).execute(self.pool).await.map_err(map_err)?;
 
         Ok(())
     }

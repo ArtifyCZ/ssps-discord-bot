@@ -57,8 +57,8 @@ impl ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
     fn archived_authenticated_user_repository(
         &self,
-    ) -> impl ArchivedAuthenticatedUserRepository + Send + Sync {
-        PostgresArchivedAuthenticatedUserRepository::new(self.postgres_pool.clone())
+    ) -> impl ArchivedAuthenticatedUserRepository + Send + Sync + use<'_> {
+        PostgresArchivedAuthenticatedUserRepository::new(&self.postgres_pool)
     }
 
     #[instrument(level = "trace", skip(self))]
