@@ -1,5 +1,4 @@
 use application_ports::user::{AuthenticatedUserInfoDto, UserError, UserPort};
-use async_trait::async_trait;
 use chrono::Duration;
 use domain::authentication::authenticated_user::{
     AuthenticatedUserRepository, AuthenticatedUserRepositoryError,
@@ -52,7 +51,6 @@ where
     }
 }
 
-#[async_trait]
 impl<
         TAuthenticatedUserRepository,
         TRoleSyncRequestedRepository,

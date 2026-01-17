@@ -1,17 +1,22 @@
-use async_trait::async_trait;
 use chrono::Duration;
 use domain_shared::discord::UserId;
+use std::future::Future;
 use thiserror::Error;
 use tracing::error;
 
-#[async_trait]
 pub trait UserPort {
-    async fn get_user_info(
+    fn get_user_info(
         &self,
         user_id: UserId,
-    ) -> Result<Option<AuthenticatedUserInfoDto>, UserError>;
-    async fn refresh_user_roles(&self, user_id: UserId) -> Result<(), UserError>;
-    async fn refresh_user_info(&self, user_id: UserId) -> Result<Duration, UserError>;
+    ) -> impl Future<Output = Result<Option<AuthenticatedUserInfoDto>, UserError>> + Send;
+    fn refresh_user_roles(
+        &self,
+        user_id: UserId,
+    ) -> impl Future<Output = Result<(), UserError>> + Send;
+    fn refresh_user_info(
+        &self,
+        user_id: UserId,
+    ) -> impl Future<Output = Result<Duration, UserError>> + Send;
 }
 
 #[derive(Debug, Error)]
