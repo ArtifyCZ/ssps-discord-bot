@@ -17,7 +17,7 @@ pub async fn command<D: Sync + Locator>(
     ctx: Context<'_, D>,
     #[description = "Selected target"] target: serenity::User,
 ) -> Result<(), Error> {
-    let user_port = ctx.data().create_user_port();
+    let mut user_port = ctx.data().create_user_port();
 
     info!(
         guild_id = ctx.guild_id().map(|id| id.get()),

@@ -19,7 +19,7 @@ pub async fn command<D: Sync + Locator>(
     #[description = "Selected target"] target: serenity::User,
     #[description = "Force refresh user info (default false)"] force_refresh: Option<bool>,
 ) -> Result<(), Error> {
-    let user_port = ctx.data().create_user_port();
+    let mut user_port = ctx.data().create_user_port();
 
     info!(
         guild_id = ctx.guild_id().map(|id| id.get()),

@@ -5,15 +5,15 @@ use thiserror::Error;
 
 pub trait UserPort {
     fn get_user_info(
-        &self,
+        &mut self,
         user_id: UserId,
     ) -> impl Future<Output = Result<Option<AuthenticatedUserInfoDto>, UserError>> + Send;
     fn refresh_user_roles(
-        &self,
+        &mut self,
         user_id: UserId,
     ) -> impl Future<Output = Result<(), UserError>> + Send;
     fn refresh_user_info(
-        &self,
+        &mut self,
         user_id: UserId,
     ) -> impl Future<Output = Result<Duration, UserError>> + Send;
 }

@@ -68,7 +68,7 @@ where
 {
     #[instrument(level = "info", skip(self))]
     async fn get_user_info(
-        &self,
+        &mut self,
         user_id: UserId,
     ) -> Result<Option<AuthenticatedUserInfoDto>, UserError> {
         let user = match self
@@ -91,7 +91,7 @@ where
     }
 
     #[instrument(level = "info", skip(self))]
-    async fn refresh_user_roles(&self, user_id: UserId) -> Result<(), UserError> {
+    async fn refresh_user_roles(&mut self, user_id: UserId) -> Result<(), UserError> {
         let request = request_role_sync(user_id);
         self.role_sync_requested_repository
             .save(&request)
@@ -102,7 +102,7 @@ where
     }
 
     #[instrument(level = "info", skip(self))]
-    async fn refresh_user_info(&self, user_id: UserId) -> Result<Duration, UserError> {
+    async fn refresh_user_info(&mut self, user_id: UserId) -> Result<Duration, UserError> {
         let request = request_user_info_sync(user_id);
         self.user_info_sync_requested_repository
             .save(&request)
