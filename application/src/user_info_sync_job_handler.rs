@@ -9,7 +9,7 @@ use domain::authentication::authenticated_user::{
 use domain::class::class_group::find_class_group;
 use domain::class::class_id::get_class_id;
 use domain::jobs::role_sync_job::{
-    request_role_sync, RoleSyncRequestedRepository, RoleSyncRequestedRepositoryError,
+    RoleSyncRequestedRepository, RoleSyncRequestedRepositoryError, request_role_sync,
 };
 use domain::jobs::user_info_sync_job::{
     UserInfoSyncRequested, UserInfoSyncRequestedRepository, UserInfoSyncRequestedRepositoryError,
@@ -30,11 +30,11 @@ pub struct UserInfoSyncJobHandler<
 }
 
 impl<
-        TAuthenticatedUserRepository,
-        TRoleSyncRequestedRepository,
-        TUserInfoSyncRequestedRepository,
-        TOAuthAdapter,
-    >
+    TAuthenticatedUserRepository,
+    TRoleSyncRequestedRepository,
+    TUserInfoSyncRequestedRepository,
+    TOAuthAdapter,
+>
     UserInfoSyncJobHandler<
         TAuthenticatedUserRepository,
         TRoleSyncRequestedRepository,
@@ -174,11 +174,11 @@ where
 
 #[async_trait]
 impl<
-        TAuthenticatedUserRepository,
-        TRoleSyncRequestedRepository,
-        TUserInfoSyncRequestedRepository,
-        TOAuthAdapter,
-    > UserInfoSyncJobHandlerPort
+    TAuthenticatedUserRepository,
+    TRoleSyncRequestedRepository,
+    TUserInfoSyncRequestedRepository,
+    TOAuthAdapter,
+> UserInfoSyncJobHandlerPort
     for UserInfoSyncJobHandler<
         TAuthenticatedUserRepository,
         TRoleSyncRequestedRepository,

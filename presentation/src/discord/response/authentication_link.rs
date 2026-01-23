@@ -1,7 +1,7 @@
 use domain_shared::authentication::AuthenticationLink;
+use poise::CreateReply;
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::{ButtonStyle, CreateActionRow, CreateButton, Mentionable};
-use poise::CreateReply;
 use serenity::CreateMessage;
 use tracing::instrument;
 

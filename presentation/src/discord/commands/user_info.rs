@@ -3,9 +3,9 @@ use crate::discord::{Context, Error};
 use application_ports::user::AuthenticatedUserInfoDto;
 use application_ports::user::UserPort;
 use domain_shared::discord::UserId;
+use poise::CreateReply;
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::{CreateEmbed, Mentionable};
-use poise::CreateReply;
 use tracing::{error, info, instrument, warn};
 
 #[poise::command(

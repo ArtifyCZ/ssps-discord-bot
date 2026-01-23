@@ -3,7 +3,7 @@ use domain::jobs::role_sync_job::{
     RoleSyncRequested, RoleSyncRequestedRepository, RoleSyncRequestedRepositoryError,
 };
 use domain_shared::discord::UserId;
-use sqlx::{query, PgPool};
+use sqlx::{PgPool, query};
 use tokio::sync::mpsc;
 use tracing::{instrument, warn};
 

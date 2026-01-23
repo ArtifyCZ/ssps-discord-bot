@@ -3,7 +3,7 @@ name = "bootstrap"
 authors = [
     "Richard Tichý <tichy@artify.zone>",
 ]
-edition = "2021"
+edition = "2024"
 
 [[bin]]
 name = "ssps-discord-bot"

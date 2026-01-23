@@ -1,10 +1,10 @@
 use crate::application_ports::Locator;
-use crate::discord::{response, Context, Error};
+use crate::discord::{Context, Error, response};
 use application_ports::user::UserError;
 use application_ports::user::UserPort;
 use domain_shared::discord::UserId;
-use poise::serenity_prelude as serenity;
 use poise::CreateReply;
+use poise::serenity_prelude as serenity;
 use tracing::{info, instrument, warn};
 
 #[poise::command(

@@ -1,26 +1,26 @@
 use application_ports::authentication::{AuthenticationError, AuthenticationPort};
 use domain::authentication::archived_authenticated_user::{
-    create_archived_authenticated_user_from_user, ArchivedAuthenticatedUserRepository,
-    ArchivedAuthenticatedUserRepositoryError,
+    ArchivedAuthenticatedUserRepository, ArchivedAuthenticatedUserRepositoryError,
+    create_archived_authenticated_user_from_user,
 };
 use domain::authentication::authenticated_user::{
-    create_user_from_successful_authentication, AuthenticatedUserRepository,
-    AuthenticatedUserRepositoryError,
+    AuthenticatedUserRepository, AuthenticatedUserRepositoryError,
+    create_user_from_successful_authentication,
 };
 use domain::authentication::user_authentication_request::{
-    create_user_authentication_request, UserAuthenticationRequestRepository,
-    UserAuthenticationRequestRepositoryError,
+    UserAuthenticationRequestRepository, UserAuthenticationRequestRepositoryError,
+    create_user_authentication_request,
 };
 use domain::jobs::role_sync_job::{
-    request_role_sync, RoleSyncRequestedRepository, RoleSyncRequestedRepositoryError,
+    RoleSyncRequestedRepository, RoleSyncRequestedRepositoryError, request_role_sync,
 };
 use domain::jobs::user_info_sync_job::{
-    request_user_info_sync, UserInfoSyncRequestedRepository, UserInfoSyncRequestedRepositoryError,
+    UserInfoSyncRequestedRepository, UserInfoSyncRequestedRepositoryError, request_user_info_sync,
 };
 use domain::ports::oauth::{OAuthError, OAuthPort};
 use domain_shared::authentication::{AuthenticationLink, ClientCallbackToken, CsrfToken};
 use domain_shared::discord::UserId;
-use tracing::{error, info, instrument, warn, Span};
+use tracing::{Span, error, info, instrument, warn};
 
 pub struct AuthenticationService<
     TArchivedAuthenticatedUserRepository,
@@ -39,13 +39,13 @@ pub struct AuthenticationService<
 }
 
 impl<
-        TArchivedAuthenticatedUserRepository,
-        TAuthenticatedUserRepository,
-        TRoleSyncRequestedRepository,
-        TUserAuthenticationRequestRepository,
-        TUserInfoSyncRequestedRepository,
-        TOAuthAdapter,
-    > AuthenticationPort
+    TArchivedAuthenticatedUserRepository,
+    TAuthenticatedUserRepository,
+    TRoleSyncRequestedRepository,
+    TUserAuthenticationRequestRepository,
+    TUserInfoSyncRequestedRepository,
+    TOAuthAdapter,
+> AuthenticationPort
     for AuthenticationService<
         TArchivedAuthenticatedUserRepository,
         TAuthenticatedUserRepository,

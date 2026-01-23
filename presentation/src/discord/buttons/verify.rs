@@ -1,5 +1,5 @@
 use crate::application_ports::Locator;
-use crate::discord::{response, Error};
+use crate::discord::{Error, response};
 use application_ports::authentication::AuthenticationError;
 use application_ports::authentication::AuthenticationPort;
 use domain_shared::discord::UserId;

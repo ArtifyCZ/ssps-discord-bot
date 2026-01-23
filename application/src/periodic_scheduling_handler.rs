@@ -6,11 +6,11 @@ use domain::authentication::authenticated_user::{
     AuthenticatedUserRepository, AuthenticatedUserRepositoryError,
 };
 use domain::jobs::role_sync_job::{
-    request_periodic_role_sync, RoleSyncRequestedRepository, RoleSyncRequestedRepositoryError,
+    RoleSyncRequestedRepository, RoleSyncRequestedRepositoryError, request_periodic_role_sync,
 };
 use domain::jobs::user_info_sync_job::{
-    request_periodic_user_info_sync, UserInfoSyncRequestedRepository,
-    UserInfoSyncRequestedRepositoryError,
+    UserInfoSyncRequestedRepository, UserInfoSyncRequestedRepositoryError,
+    request_periodic_user_info_sync,
 };
 use domain::ports::discord::{DiscordError, DiscordPort};
 use domain_shared::discord::UserId;
@@ -33,11 +33,11 @@ pub struct PeriodicSchedulingHandler<
 }
 
 impl<
-        TDiscordPort,
-        TAuthenticatedUserRepository,
-        TRoleSyncRequestedRepository,
-        TUserInfoSyncRequestedRepository,
-    >
+    TDiscordPort,
+    TAuthenticatedUserRepository,
+    TRoleSyncRequestedRepository,
+    TUserInfoSyncRequestedRepository,
+>
     PeriodicSchedulingHandler<
         TDiscordPort,
         TAuthenticatedUserRepository,
@@ -134,7 +134,10 @@ where
             let offset = chunk.last().copied();
 
             let chunk_sample = &chunk[0..chunk.len().min(6)];
-            info!("Successfully retrieved the list of discord members for periodic scheduling with new offset {:?}: sample(0..6): {:?}", offset, chunk_sample);
+            info!(
+                "Successfully retrieved the list of discord members for periodic scheduling with new offset {:?}: sample(0..6): {:?}",
+                offset, chunk_sample
+            );
 
             Ok((chunk, offset))
         } else {
@@ -145,11 +148,11 @@ where
 
 #[async_trait]
 impl<
-        TDiscordPort,
-        TAuthenticatedUserRepository,
-        TRoleSyncRequestedRepository,
-        TUserInfoSyncRequestedRepository,
-    > PeriodicSchedulingHandlerPort
+    TDiscordPort,
+    TAuthenticatedUserRepository,
+    TRoleSyncRequestedRepository,
+    TUserInfoSyncRequestedRepository,
+> PeriodicSchedulingHandlerPort
     for PeriodicSchedulingHandler<
         TDiscordPort,
         TAuthenticatedUserRepository,
@@ -198,7 +201,9 @@ fn map_discord_err(err: DiscordError) -> PeriodicSchedulingHandlerError {
 fn map_user_repo_err(err: AuthenticatedUserRepositoryError) -> PeriodicSchedulingHandlerError {
     match err {
         AuthenticatedUserRepositoryError::ServiceUnavailable => {
-            error!("Periodic scheduling handler is temporarily unavailable: authenticated user repository is unavailable");
+            error!(
+                "Periodic scheduling handler is temporarily unavailable: authenticated user repository is unavailable"
+            );
             PeriodicSchedulingHandlerError::TemporarilyUnavailable
         }
     }
@@ -210,7 +215,9 @@ fn map_user_info_sync_job_repo_err(
 ) -> PeriodicSchedulingHandlerError {
     match err {
         UserInfoSyncRequestedRepositoryError::ServiceUnavailable => {
-            error!("Periodic scheduling handler is temporarily unavailable: user info sync job repository is unavailable");
+            error!(
+                "Periodic scheduling handler is temporarily unavailable: user info sync job repository is unavailable"
+            );
             PeriodicSchedulingHandlerError::TemporarilyUnavailable
         }
     }
@@ -222,7 +229,9 @@ fn map_role_sync_job_repo_err(
 ) -> PeriodicSchedulingHandlerError {
     match err {
         RoleSyncRequestedRepositoryError::ServiceUnavailable => {
-            error!("Periodic scheduling handler is temporarily unavailable: role sync job repository is unavailable");
+            error!(
+                "Periodic scheduling handler is temporarily unavailable: role sync job repository is unavailable"
+            );
             PeriodicSchedulingHandlerError::TemporarilyUnavailable
         }
     }

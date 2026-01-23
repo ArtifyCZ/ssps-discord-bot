@@ -5,7 +5,7 @@ use domain::authentication::archived_authenticated_user::{
 };
 use domain::ports::oauth::OAuthToken;
 use domain_shared::authentication::ArchivedUserId;
-use sqlx::{query, PgPool};
+use sqlx::{PgPool, query};
 use tracing::{instrument, warn};
 
 pub struct PostgresArchivedAuthenticatedUserRepository<'a> {

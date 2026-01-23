@@ -1,4 +1,5 @@
 use crate::application_ports::Locator;
+use crate::application_ports::LocatorScope;
 use application_ports::authentication::AuthenticationError;
 use application_ports::authentication::AuthenticationPort;
 use axum::extract::Query;
@@ -22,7 +23,8 @@ pub async fn callback_handler<L: Locator>(
     State(service_locator): State<L>,
     Query(query): Query<AuthRequest>,
 ) -> Response {
-    let mut authentication_port = service_locator.create_authentication_port();
+    let mut locator_scope = service_locator.create_scope().await;
+    let mut authentication_port = locator_scope.create_authentication_port();
     let discord_client = service_locator.get_discord_client();
 
     let user_id = match authentication_port

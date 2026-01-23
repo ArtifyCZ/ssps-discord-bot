@@ -52,10 +52,9 @@ async fn event_handler<L: Locator>(
     if let serenity::FullEvent::InteractionCreate {
         interaction: Interaction::Component(component_interaction),
     } = event
+        && let ComponentInteractionDataKind::Button = component_interaction.data.kind
     {
-        if let ComponentInteractionDataKind::Button = component_interaction.data.kind {
-            buttons::handle_button_click(ctx, component_interaction, framework, locator).await?
-        }
+        buttons::handle_button_click(ctx, component_interaction, framework, locator).await?
     }
 
     Ok(())

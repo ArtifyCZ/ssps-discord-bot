@@ -1,7 +1,7 @@
 use crate::application_ports::Locator;
+use axum::Router;
 use axum::extract::MatchedPath;
 use axum::http::Request;
-use axum::Router;
 use tower_http::trace::TraceLayer;
 use tracing::{info_span, instrument};
 

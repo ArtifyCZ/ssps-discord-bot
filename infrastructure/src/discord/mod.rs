@@ -174,10 +174,9 @@ impl<'a> DiscordPort for DiscordAdapter<'a> {
             Err(err) => {
                 if let serenity::Error::Http(serenity::http::HttpError::UnsuccessfulRequest(err)) =
                     &err
+                    && err.status_code == 404
                 {
-                    if err.status_code == 404 {
-                        return Ok(None);
-                    }
+                    return Ok(None);
                 }
                 return Err(map_serenity_err(err));
             }

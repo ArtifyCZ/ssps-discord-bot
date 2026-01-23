@@ -4,10 +4,10 @@ use domain::authentication::authenticated_user::{
     AuthenticatedUserRepository, AuthenticatedUserRepositoryError,
 };
 use domain::jobs::role_sync_job::{
-    request_role_sync, RoleSyncRequestedRepository, RoleSyncRequestedRepositoryError,
+    RoleSyncRequestedRepository, RoleSyncRequestedRepositoryError, request_role_sync,
 };
 use domain::jobs::user_info_sync_job::{
-    request_user_info_sync, UserInfoSyncRequestedRepository, UserInfoSyncRequestedRepositoryError,
+    UserInfoSyncRequestedRepository, UserInfoSyncRequestedRepositoryError, request_user_info_sync,
 };
 use domain_shared::discord::UserId;
 use tracing::{info, instrument, warn};
@@ -22,11 +22,7 @@ pub struct UserService<
     user_info_sync_requested_repository: TUserInfoSyncRequestedRepository,
 }
 
-impl<
-        TAuthenticatedUserRepository,
-        TRoleSyncRequestedRepository,
-        TUserInfoSyncRequestedRepository,
-    >
+impl<TAuthenticatedUserRepository, TRoleSyncRequestedRepository, TUserInfoSyncRequestedRepository>
     UserService<
         TAuthenticatedUserRepository,
         TRoleSyncRequestedRepository,
@@ -51,11 +47,8 @@ where
     }
 }
 
-impl<
-        TAuthenticatedUserRepository,
-        TRoleSyncRequestedRepository,
-        TUserInfoSyncRequestedRepository,
-    > UserPort
+impl<TAuthenticatedUserRepository, TRoleSyncRequestedRepository, TUserInfoSyncRequestedRepository>
+    UserPort
     for UserService<
         TAuthenticatedUserRepository,
         TRoleSyncRequestedRepository,

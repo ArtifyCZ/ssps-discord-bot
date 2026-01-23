@@ -25,7 +25,7 @@ use infrastructure::discord::DiscordAdapter;
 use infrastructure::jobs::role_sync_job_repository::PostgresRoleSyncRequestedRepository;
 use infrastructure::jobs::user_info_sync_job_repository::PostgresUserInfoSyncRequestedRepository;
 use infrastructure::oauth::{OAuthAdapter, OAuthAdapterConfig};
-use presentation::application_ports::Locator;
+use presentation::application_ports::{Locator, LocatorScope};
 use serenity::all::GuildId;
 use std::sync::Arc;
 use tracing::instrument;
@@ -96,6 +96,28 @@ impl ApplicationPortLocator {
     }
 }
 
+struct ApplicationPortLocatorScope<'l> {
+    locator: &'l ApplicationPortLocator,
+}
+
+impl LocatorScope for ApplicationPortLocatorScope<'_> {
+    #[instrument(level = "trace", skip(self))]
+    fn create_authentication_port(&mut self) -> impl AuthenticationPort + Send + Sync {
+        AuthenticationService {
+            oauth_port: self.locator.oauth_adapter(),
+            archived_authenticated_user_repository: self
+                .locator
+                .archived_authenticated_user_repository(),
+            authenticated_user_repository: self.locator.authenticated_user_repository(),
+            user_authentication_request_repository: self
+                .locator
+                .user_authentication_request_repository(),
+            user_info_sync_requested_repository: self.locator.user_info_sync_requested_repository(),
+            role_sync_requested_repository: self.locator.role_sync_requested_repository(),
+        }
+    }
+}
+
 impl Locator for ApplicationPortLocator {
     #[instrument(level = "trace", skip(self))]
     fn create_authentication_port(&self) -> impl AuthenticationPort + Send + Sync {
@@ -155,6 +177,11 @@ impl Locator for ApplicationPortLocator {
             self.role_sync_requested_repository(),
             self.user_info_sync_requested_repository(),
         )
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    async fn create_scope(&self) -> impl LocatorScope + Send + Sync {
+        ApplicationPortLocatorScope { locator: self }
     }
 
     #[instrument(level = "trace", skip(self))]

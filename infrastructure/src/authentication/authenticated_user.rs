@@ -6,7 +6,7 @@ use domain::authentication::authenticated_user::{
 use domain::ports::oauth::OAuthToken;
 use domain_shared::authentication::{AccessToken, RefreshToken};
 use domain_shared::discord::UserId;
-use sqlx::{query, PgPool};
+use sqlx::{PgPool, query};
 use tracing::{instrument, warn};
 
 pub struct PostgresAuthenticatedUserRepository<'a> {

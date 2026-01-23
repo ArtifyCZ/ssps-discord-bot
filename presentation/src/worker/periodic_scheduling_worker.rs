@@ -27,7 +27,9 @@ pub async fn run_periodic_scheduling_worker<L: Locator + Send + Sync + 'static>(
                     .unwrap_or(Duration::from_secs(3 * 60));
                 if duration >= Duration::from_secs(60 * 60) {
                     duration = Duration::from_secs(30 * 60);
-                    error!("Periodic scheduling worker is temporarily unavailable. Sleeping for one hour");
+                    error!(
+                        "Periodic scheduling worker is temporarily unavailable. Sleeping for one hour"
+                    );
                 }
                 if duration >= Duration::from_secs(30 * 60) {
                     error!(

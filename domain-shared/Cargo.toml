@@ -1,6 +1,6 @@
 [package]
 name = "domain-shared"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 chrono = "0.4"

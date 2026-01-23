@@ -4,7 +4,7 @@ use domain::authentication::user_authentication_request::{
     UserAuthenticationRequestRepositoryError, UserAuthenticationRequestSnapshot,
 };
 use domain_shared::authentication::CsrfToken;
-use sqlx::{query, PgPool};
+use sqlx::{PgPool, query};
 use tracing::{instrument, warn};
 
 pub struct PostgresUserAuthenticationRequestRepository<'a> {
