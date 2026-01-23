@@ -19,7 +19,7 @@ pub async fn command<D: Sync + Locator>(ctx: Context<'_, D>) -> Result<(), Error
         "Creating authentication link",
     );
 
-    let authentication_port = ctx.data().create_authentication_port();
+    let mut authentication_port = ctx.data().create_authentication_port();
 
     let user = ctx.author();
 

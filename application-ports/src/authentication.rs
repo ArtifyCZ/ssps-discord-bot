@@ -5,11 +5,11 @@ use thiserror::Error;
 
 pub trait AuthenticationPort {
     fn create_authentication_link<'a>(
-        &'a self,
+        &'a mut self,
         user_id: UserId,
     ) -> impl Future<Output = Result<AuthenticationLink, AuthenticationError>> + Send + 'a;
     fn confirm_authentication<'a>(
-        &'a self,
+        &'a mut self,
         csrf_token: CsrfToken,
         client_callback_token: ClientCallbackToken,
     ) -> impl Future<Output = Result<(UserId, &'a InviteLink), AuthenticationError>> + Send + 'a;

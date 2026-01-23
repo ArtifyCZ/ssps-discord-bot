@@ -21,7 +21,7 @@ pub async fn handle_button_click<L: Locator>(
         "User clicked on the verify button",
     );
 
-    let authentication_port = locator.create_authentication_port();
+    let mut authentication_port = locator.create_authentication_port();
     interaction.defer_ephemeral(ctx.http()).await?;
 
     let response = match authentication_port

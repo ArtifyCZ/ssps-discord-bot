@@ -69,7 +69,7 @@ where
 {
     #[instrument(level = "info", skip(self))]
     async fn create_authentication_link(
-        &self,
+        &mut self,
         user_id: UserId,
     ) -> Result<AuthenticationLink, AuthenticationError> {
         let (link, csrf_token) = self.oauth_port.create_authentication_link().await;
@@ -88,7 +88,7 @@ where
 
     #[instrument(level = "info", skip(self, csrf_token, client_callback_token))]
     async fn confirm_authentication(
-        &self,
+        &mut self,
         csrf_token: CsrfToken,
         client_callback_token: ClientCallbackToken,
     ) -> Result<(UserId, &InviteLink), AuthenticationError> {
