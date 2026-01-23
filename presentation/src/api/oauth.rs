@@ -25,7 +25,7 @@ pub async fn callback_handler<L: Locator>(
     let mut authentication_port = service_locator.create_authentication_port();
     let discord_client = service_locator.get_discord_client();
 
-    let (user_id, invite_link) = match authentication_port
+    let user_id = match authentication_port
         .confirm_authentication(CsrfToken(query.state), ClientCallbackToken(query.code))
         .await
     {
@@ -33,7 +33,7 @@ pub async fn callback_handler<L: Locator>(
         Err(err) => return response_auth_error(err),
     };
     let user_id = serenity::UserId::new(user_id.0);
-    let msg = response_successfully_verified(user_id, &invite_link.0);
+    let msg = response_successfully_verified(user_id, &service_locator.get_invite_link().0);
     let message = match user_id.direct_message(discord_client, msg).await {
         Ok(msg) => msg,
         Err(err) => {

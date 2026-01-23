@@ -1,6 +1,6 @@
 use core::future::Future;
 use domain_shared::authentication::{AuthenticationLink, ClientCallbackToken, CsrfToken};
-use domain_shared::discord::{InviteLink, UserId};
+use domain_shared::discord::UserId;
 use thiserror::Error;
 
 pub trait AuthenticationPort {
@@ -12,7 +12,7 @@ pub trait AuthenticationPort {
         &'a mut self,
         csrf_token: CsrfToken,
         client_callback_token: ClientCallbackToken,
-    ) -> impl Future<Output = Result<(UserId, &'a InviteLink), AuthenticationError>> + Send + 'a;
+    ) -> impl Future<Output = Result<UserId, AuthenticationError>> + Send + 'a;
 }
 
 #[derive(Debug, Error)]

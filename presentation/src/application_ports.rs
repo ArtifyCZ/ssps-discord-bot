@@ -4,6 +4,7 @@ use application_ports::periodic_scheduling_handler::PeriodicSchedulingHandlerPor
 use application_ports::role_sync_job_handler::RoleSyncJobHandlerPort;
 use application_ports::user::UserPort;
 use application_ports::user_info_sync_job_handler::UserInfoSyncJobHandlerPort;
+use domain_shared::discord::InviteLink;
 use poise::serenity_prelude as serenity;
 
 pub trait Locator {
@@ -18,5 +19,6 @@ pub trait Locator {
     fn create_information_channel_port(&self) -> impl InformationChannelPort + Send + Sync;
     fn create_user_port(&self) -> impl UserPort + Send + Sync;
 
+    fn get_invite_link(&self) -> &InviteLink;
     fn get_discord_client(&self) -> &serenity::http::Http;
 }

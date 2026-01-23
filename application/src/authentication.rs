@@ -1,5 +1,4 @@
 use application_ports::authentication::{AuthenticationError, AuthenticationPort};
-use application_ports::discord::InviteLink;
 use domain::authentication::archived_authenticated_user::{
     create_archived_authenticated_user_from_user, ArchivedAuthenticatedUserRepository,
     ArchivedAuthenticatedUserRepositoryError,
@@ -24,7 +23,6 @@ use domain_shared::discord::UserId;
 use tracing::{error, info, instrument, warn, Span};
 
 pub struct AuthenticationService<
-    'a,
     TArchivedAuthenticatedUserRepository,
     TAuthenticatedUserRepository,
     TRoleSyncRequestedRepository,
@@ -38,11 +36,9 @@ pub struct AuthenticationService<
     pub user_authentication_request_repository: TUserAuthenticationRequestRepository,
     pub user_info_sync_requested_repository: TUserInfoSyncRequestedRepository,
     pub oauth_port: TOAuthAdapter,
-    pub invite_link: &'a InviteLink,
 }
 
 impl<
-        'a,
         TArchivedAuthenticatedUserRepository,
         TAuthenticatedUserRepository,
         TRoleSyncRequestedRepository,
@@ -51,7 +47,6 @@ impl<
         TOAuthAdapter,
     > AuthenticationPort
     for AuthenticationService<
-        'a,
         TArchivedAuthenticatedUserRepository,
         TAuthenticatedUserRepository,
         TRoleSyncRequestedRepository,
@@ -91,7 +86,7 @@ where
         &mut self,
         csrf_token: CsrfToken,
         client_callback_token: ClientCallbackToken,
-    ) -> Result<(UserId, &InviteLink), AuthenticationError> {
+    ) -> Result<UserId, AuthenticationError> {
         let mut request = match self
             .user_authentication_request_repository
             .find_by_csrf_token(&csrf_token)
@@ -212,7 +207,7 @@ where
 
         info!(user_id = user_id.0, "User successfully authenticated");
 
-        Ok((user.user_id(), self.invite_link))
+        Ok(user.user_id())
     }
 }
 

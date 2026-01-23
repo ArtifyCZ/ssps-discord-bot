@@ -106,7 +106,6 @@ impl Locator for ApplicationPortLocator {
             user_authentication_request_repository: self.user_authentication_request_repository(),
             user_info_sync_requested_repository: self.user_info_sync_requested_repository(),
             role_sync_requested_repository: self.role_sync_requested_repository(),
-            invite_link: &self.invite_link,
         }
     }
 
@@ -156,6 +155,11 @@ impl Locator for ApplicationPortLocator {
             self.role_sync_requested_repository(),
             self.user_info_sync_requested_repository(),
         )
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    fn get_invite_link(&self) -> &InviteLink {
+        &self.invite_link
     }
 
     #[instrument(level = "trace", skip(self))]
