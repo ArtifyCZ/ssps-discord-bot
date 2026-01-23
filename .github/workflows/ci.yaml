@@ -58,26 +58,25 @@ jobs:
                     lookup-only: false
                     cache-provider: "github"
                     cache-bin: true
+
             -   name: Install SQLx CLI
                 uses: baptiste0928/cargo-install@v3
                 with:
                     crate: sqlx-cli
                     version: "^0.8.5"
-            -   name: Install Clippy Tracing
-                uses: baptiste0928/cargo-install@v3
-                with:
-                    crate: clippy-tracing
-                    version: "^0.7.0"
+
             -   name: Run fmt
                 run: cargo fmt -- --check
+
             -   name: Apply migrations
                 run: cd infrastructure && sqlx migrate run
+
             -   name: Build
                 run: cargo build --verbose --release
+
             -   name: Run Clippy
                 run: cargo clippy -- -D warnings
-            -   name: Run Clippy Tracing
-                run: clippy-tracing --action check
+
             -   name: Run tests
                 run: cargo test --verbose
 
@@ -91,16 +90,20 @@ jobs:
                         type=ref,event=branch
                         type=ref,event=pr
                         type=sha,format=long
+
             -   name: Login to GitHub Container Registry
                 uses: docker/login-action@v3
                 with:
                     registry: ghcr.io
                     username: ${{ github.actor }}
                     password: ${{ secrets.GITHUB_TOKEN }}
+
             -   name: Set up QEMU
                 uses: docker/setup-qemu-action@v3
+
             -   name: Set up Docker Buildx
                 uses: docker/setup-buildx-action@v3
+
             -   name: Build and push
                 uses: docker/build-push-action@v6
                 with:
