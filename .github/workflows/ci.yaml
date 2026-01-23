@@ -34,6 +34,14 @@ jobs:
             DOCKER_METADATA_PR_HEAD_SHA: true
         steps:
             -   uses: actions/checkout@v4
+
+            -   name: Set up Rust toolchain
+                uses: actions-rs/toolchain@v1
+                with:
+                    toolchain: stable
+                    override: true
+                    components: rustfmt, clippy
+
             -   name: Set up Rust caching
                 uses: Swatinem/rust-cache@v2
                 with:
