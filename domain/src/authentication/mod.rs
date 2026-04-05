@@ -6,13 +6,16 @@ pub mod user_authentication_request;
 
 #[instrument(level = "trace")]
 pub fn create_class_ids() -> Vec<String> {
+    let prefixes = ["", "c", "h", "g", "l"];
     let years = ["1", "2", "3", "4"];
-    let classes = ["a", "b", "c", "g", "ga", "gb", "k"];
+    let suffixes = ["a", "b", "c", "d", "g", "ga", "gb", "k"];
     let mut class_ids = Vec::new();
-    for year in years.iter() {
-        for class in classes.iter() {
-            let class_id = format!("{}{}", year, class);
-            class_ids.push(class_id);
+    for prefix in prefixes.iter() {
+        for year in years.iter() {
+            for suffix in suffixes.iter() {
+                let class_id = format!("{}{}{}", prefix, year, suffix);
+                class_ids.push(class_id);
+            }
         }
     }
     class_ids
