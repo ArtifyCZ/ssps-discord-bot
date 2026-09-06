@@ -49,33 +49,15 @@ impl RolesDiffService {
             diff.remove(*role_id);
         }
 
-        if let Some(user) = user
-            && let Some(user_class_id) = user.class_id()
-        {
-            for (class_id, role) in &self.class_id_to_role_id {
-                if class_id.eq_ignore_ascii_case(user_class_id) {
-                    diff.assign(*role);
-                    break;
-                }
-            }
-        }
+        let Some(user) = user else {
+            return;
+        };
 
-        for (class_id, role_id) in &self.class_id_to_role_id {
-            if user
-                .and_then(|u| u.class_id().map(|c| c.eq_ignore_ascii_case(class_id)))
-                .unwrap_or(false)
-            {
-                diff.assign(*role_id);
-                break;
-            }
-        }
+        let class_role_id = self
+            .get_class_role_id(user)
+            .unwrap_or(self.unknown_class_role_id);
 
-        if let Some(user) = user {
-            let class_role_id = self
-                .get_class_role_id(user)
-                .unwrap_or(self.unknown_class_role_id);
-            diff.assign(class_role_id);
-        }
+        diff.assign(class_role_id);
     }
 
     #[instrument(level = "trace", skip_all)]

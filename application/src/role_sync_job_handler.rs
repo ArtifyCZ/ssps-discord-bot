@@ -10,7 +10,7 @@ use domain::jobs::role_sync_job::{
 use domain::ports::discord::{DiscordError, DiscordPort};
 use domain::roles::RolesDiffService;
 use domain_shared::discord::RoleId;
-use tracing::{error, info, instrument};
+use tracing::{error, info, instrument, warn};
 
 pub struct RoleSyncJobHandler<
     TDiscordPort,
@@ -121,12 +121,23 @@ where
         let mut class_id_to_role_id = Vec::new();
 
         for class_id in &self.class_ids {
-            let role = self
+            let role_id = self
                 .discord_port
-                .find_or_create_role_by_name(&class_id.to_uppercase(), "Role for students of class")
+                .find_class_role(class_id)
                 .await
                 .map_err(map_discord_err)?;
-            class_id_to_role_id.push((class_id.to_string(), role.role_id));
+
+            match role_id {
+                Some(role_id) => {
+                    class_id_to_role_id.push((class_id.to_string(), role_id));
+                }
+                None => {
+                    warn!(
+                        "Discord role for class '{}' does not exist, users from this class will get the unknown class role",
+                        class_id
+                    );
+                }
+            }
         }
 
         Ok(RolesDiffService {
