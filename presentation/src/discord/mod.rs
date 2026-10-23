@@ -20,9 +20,7 @@ pub async fn run_bot<L: Locator + Send + Sync + 'static>(
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: commands::enabled_commands(),
-            event_handler: |ctx, event, framework, locator| {
-                Box::pin(event_handler(ctx, event, framework, locator))
-            },
+            event_handler: |ctx, event| Box::pin(event_handler(ctx, event)),
             ..Default::default()
         })
         .setup(move |ctx, _ready, framework| {
@@ -42,19 +40,17 @@ pub async fn run_bot<L: Locator + Send + Sync + 'static>(
     Ok(())
 }
 
-#[instrument(level = "debug", skip(ctx, event, framework, locator))]
+#[instrument(level = "debug", skip(ctx, event))]
 async fn event_handler<L: Locator>(
-    ctx: &serenity::Context,
+    ctx: poise::FrameworkContext<'_, L, Error>,
     event: &serenity::FullEvent,
-    framework: poise::FrameworkContext<'_, L, Error>,
-    locator: &L,
 ) -> Result<(), Error> {
     if let serenity::FullEvent::InteractionCreate {
         interaction: Interaction::Component(component_interaction),
     } = event
         && let ComponentInteractionDataKind::Button = component_interaction.data.kind
     {
-        buttons::handle_button_click(ctx, component_interaction, framework, locator).await?
+        buttons::handle_button_click(ctx, component_interaction).await?
     }
 
     Ok(())

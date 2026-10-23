@@ -3,17 +3,16 @@ name = "infrastructure"
 edition = "2024"
 
 [dependencies]
-domain = { path = "../domain" }
-domain-shared = { path = "../domain-shared" }
+domain.workspace = true
+domain-shared.workspace = true
 
 async-trait = "0.1"
 chrono = "0.4"
 oauth2 = "5.0"
-poise = "0.6"
+poise = "0.7"
 reqwest = "0.12"
-sqlx = { version = "0.8", features = [ "runtime-tokio", "tls-native-tls", "postgres", "migrate", "chrono"] }
+sqlx = { version = "0.9", features = [ "runtime-tokio", "tls-native-tls", "postgres", "migrate", "chrono"] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-thiserror = "2.0"
 tracing = "0.1"
-tokio = "1.47.1"
+tokio = "1.54"

@@ -5,9 +5,6 @@ pub mod locator;
 use crate::args::CommonArgs;
 use crate::command::Command;
 use clap::Parser;
-use sentry::types::Dsn;
-use std::borrow::Cow;
-use std::str::FromStr;
 use tracing::instrument;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt;
@@ -24,21 +21,21 @@ pub struct Cli {
 impl Cli {
     #[instrument(level = "trace", skip(self))]
     pub async fn run(self) -> anyhow::Result<()> {
-        let _guard = self
-            .args
-            .sentry_dsn
-            .as_ref()
-            .map(|dsn| Dsn::from_str(dsn).expect("Invalid Sentry DSN"))
-            .map(|sentry_dsn| {
-                sentry::init(sentry::ClientOptions {
-                    dsn: Some(sentry_dsn),
-                    environment: self.args.sentry_environment.clone().map(Cow::from),
-                    release: sentry::release_name!(),
-                    sample_rate: self.args.sentry_sample_rate.unwrap_or(0.0),
-                    traces_sample_rate: self.args.sentry_traces_sample_rate.unwrap_or(0.0),
-                    ..Default::default()
-                })
-            });
+        let _guard = self.args.sentry_dsn.as_ref().map(|sentry_dsn| {
+            sentry::init(
+                sentry::ClientOptions::new()
+                    .dsn(sentry_dsn)
+                    .environment(
+                        self.args
+                            .sentry_environment
+                            .clone()
+                            .unwrap_or("Unknown".to_string()),
+                    )
+                    .maybe_release(sentry::release_name!())
+                    .sample_rate(self.args.sentry_sample_rate.unwrap_or(0.0))
+                    .traces_sample_rate(self.args.sentry_traces_sample_rate.unwrap_or(0.0)),
+            )
+        });
 
         tracing_subscriber::registry()
             .with(EnvFilter::from_default_env())

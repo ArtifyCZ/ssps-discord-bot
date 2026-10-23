@@ -9,20 +9,20 @@ use tracing::{error, info, instrument};
 
 pub const BUTTON_ID: &str = domain::information_channel::VERIFY_ME_BUTTON_ID;
 
-#[instrument(level = "info", skip(ctx, interaction, _framework, locator))]
+#[instrument(level = "info", skip(ctx, interaction))]
 pub async fn handle_button_click<L: Locator>(
-    ctx: &serenity::Context,
+    ctx: poise::FrameworkContext<'_, L, Error>,
     interaction: &serenity::ComponentInteraction,
-    _framework: poise::FrameworkContext<'_, L, Error>,
-    locator: &L,
 ) -> Result<(), Error> {
     info!(
         user_id = interaction.user.id.get(),
         "User clicked on the verify button",
     );
 
-    let mut authentication_port = locator.create_authentication_port();
-    interaction.defer_ephemeral(ctx.http()).await?;
+    let mut authentication_port = ctx.user_data.create_authentication_port();
+    interaction
+        .defer_ephemeral(ctx.serenity_context.http())
+        .await?;
 
     let response = match authentication_port
         .create_authentication_link(UserId(interaction.user.id.get()))
@@ -30,7 +30,10 @@ pub async fn handle_button_click<L: Locator>(
     {
         Ok(link) => {
             let msg = response::authentication_link::authentication_link(link, &interaction.user);
-            let msg = interaction.user.direct_message(ctx, msg).await?;
+            let msg = interaction
+                .user
+                .direct_message(ctx.serenity_context, msg)
+                .await?;
             response::authentication_link::tell_user_direct_message_sent(
                 &interaction.user,
                 &msg.link(),
@@ -50,7 +53,7 @@ pub async fn handle_button_click<L: Locator>(
 
     interaction
         .edit_response(
-            ctx,
+            ctx.serenity_context,
             response.to_slash_initial_response_edit(serenity::EditInteractionResponse::new()),
         )
         .await?;

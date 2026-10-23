@@ -3,7 +3,7 @@ name = "application-ports"
 edition = "2024"
 
 [dependencies]
-domain-shared = { path = "../domain-shared" }
+domain-shared.workspace = true
 
 async-trait = "0.1"
 chrono = "0.4"

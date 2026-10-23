@@ -3,16 +3,15 @@ name = "application"
 edition = "2024"
 
 [dependencies]
-application-ports = { path = "../application-ports" }
-domain = { path = "../domain" }
-domain-shared = { path = "../domain-shared" }
+application-ports.workspace = true
+domain.workspace = true
+domain-shared.workspace = true
 
 async-trait = "0.1"
 chrono = "0.4"
 tracing = "0.1"
-tokio = { version = "1.47", features = ["full"] }
+tokio = { version = "1.54", features = ["full"] }
 
 [dev-dependencies]
-domain = { path = "../domain", features = ["mock"] }
-
-mockall = "0.13"
+domain.workspace = true
+domain.features = ["mock"]

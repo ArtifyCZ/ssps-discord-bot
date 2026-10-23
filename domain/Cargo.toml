@@ -3,13 +3,13 @@ name = "domain"
 edition = "2024"
 
 [dependencies]
-domain-shared = { path = "../domain-shared" }
+domain-shared.workspace = true
 
 async-trait = "0.1.87"
 chrono = "0.4.40"
 thiserror = "2.0"
 tracing = "0.1"
-mockall = { version = "0.13", optional = true }
+mockall = { version = "0.15", optional = true }
 
 [features]
 mock = ["mockall"]

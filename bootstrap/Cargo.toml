@@ -10,25 +10,24 @@ name = "ssps-discord-bot"
 path = "src/main.rs"
 
 [dependencies]
-application = { path = "../application" }
-application-ports = { path = "../application-ports" }
-domain = { path = "../domain" }
-domain-shared = { path = "../domain-shared" }
-infrastructure = { path = "../infrastructure" }
-presentation = { path = "../presentation" }
+application.workspace = true
+application-ports.workspace = true
+domain.workspace = true
+domain-shared.workspace = true
+infrastructure.workspace = true
+presentation.workspace = true
 
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive", "env"] }
 dotenv = "0.15"
 oauth2 = "5.0"
-poise = "0.6"
-sentry = "0.42"
-sentry-tracing = "0.42"
-serde = "1.0"
+poise = "0.7"
+sentry = "0.49"
+sentry-tracing = "0.49"
 serde_json = "1.0"
 serenity = { version = "0.12", features = ["full"] }
-sqlx = { version = "0.8", features = [ "runtime-tokio", "tls-native-tls", "postgres"] }
-tokio = { version = "1.43", features = ["macros", "rt-multi-thread"] }
+sqlx = { version = "0.9", features = [ "runtime-tokio", "tls-native-tls", "postgres"] }
+tokio = { version = "1.54", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5.0"
