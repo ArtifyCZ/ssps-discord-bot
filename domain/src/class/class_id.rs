@@ -1,6 +1,6 @@
 use crate::authentication::create_class_ids;
 use domain_shared::authentication::UserGroup;
-use tracing::{error, instrument};
+use tracing::{instrument, warn};
 
 #[instrument(level = "trace")]
 pub fn get_class_id(group: &UserGroup) -> Option<String> {
@@ -14,7 +14,7 @@ pub fn get_class_id(group: &UserGroup) -> Option<String> {
     let class_id = local_part.to_string();
     let class_ids = create_class_ids();
     if !class_ids.contains(&class_id) {
-        error!(
+        warn!(
             class_id = class_id.as_str(),
             "Class ID does not match any of the class IDs in the application",
         );
