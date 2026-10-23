@@ -3,9 +3,9 @@ name = "presentation"
 edition = "2024"
 
 [dependencies]
-application-ports = { path = "../application-ports" }
-domain = { path = "../domain" }
-domain-shared = { path = "../domain-shared" }
+application-ports.workspace = true
+domain.workspace = true
+domain-shared.workspace = true
 
 axum = { version = "0.8", features = ["json", "tokio", "tracing", "macros"] }
 poise = "0.7"

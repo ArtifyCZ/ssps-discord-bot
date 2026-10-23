@@ -10,12 +10,12 @@ name = "ssps-discord-bot"
 path = "src/main.rs"
 
 [dependencies]
-application = { path = "../application" }
-application-ports = { path = "../application-ports" }
-domain = { path = "../domain" }
-domain-shared = { path = "../domain-shared" }
-infrastructure = { path = "../infrastructure" }
-presentation = { path = "../presentation" }
+application.workspace = true
+application-ports.workspace = true
+domain.workspace = true
+domain-shared.workspace = true
+infrastructure.workspace = true
+presentation.workspace = true
 
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive", "env"] }

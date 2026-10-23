@@ -3,8 +3,8 @@ name = "infrastructure"
 edition = "2024"
 
 [dependencies]
-domain = { path = "../domain" }
-domain-shared = { path = "../domain-shared" }
+domain.workspace = true
+domain-shared.workspace = true
 
 async-trait = "0.1"
 chrono = "0.4"
