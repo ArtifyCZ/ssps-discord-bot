@@ -1,6 +1,6 @@
 use crate::authentication::create_class_ids;
 use domain_shared::authentication::UserGroup;
-use tracing::{error, instrument};
+use tracing::{instrument, warn};
 
 #[instrument(level = "trace")]
 pub fn find_class_group(groups: &[UserGroup]) -> Option<&UserGroup> {
@@ -21,7 +21,7 @@ pub fn find_class_group(groups: &[UserGroup]) -> Option<&UserGroup> {
         }
     }
 
-    error!(
+    warn!(
         groups = ?groups,
         "Should have found class group, but no class group found in user's groups",
     );
